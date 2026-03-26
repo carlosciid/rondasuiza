@@ -90,12 +90,20 @@
 <!-- ── Timer Widget ── -->
 <div id="timerWidget" class="hidden fixed bottom-6 right-6 z-40 bg-slate-900 rounded-2xl shadow-2xl overflow-hidden w-56 border border-slate-800">
     <div id="timerBar" class="h-1 bg-yellow-600 transition-all duration-1000" style="width:100%"></div>
-    <div class="p-4">
+    <!-- Minimized pill (shown when collapsed) -->
+    <div id="timerPill" class="hidden flex items-center gap-2 px-3 py-2 cursor-pointer" onclick="timerMinimizeToggle()">
+        <span id="timerPillDot" class="w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0"></span>
+        <span id="timerPillTime" class="text-sm font-black tabular-nums text-yellow-500">30:00</span>
+        <span id="timerPillPhase" class="text-[10px] text-slate-500 flex-1 truncate">Normal</span>
+        <span class="text-[10px] text-slate-600">▲</span>
+    </div>
+    <div id="timerBody" class="p-4">
         <div class="flex items-center justify-between mb-1">
             <span id="timerPhase" class="text-[10px] font-black uppercase tracking-widest text-slate-500">Tiempo Normal</span>
             <div class="flex items-center gap-1.5">
                 <span id="timerRound" class="text-[10px] text-slate-600 font-mono">R1</span>
                 <button id="timerMuteBtn" onclick="toggleMute()" title="Silenciar alertas" class="text-[10px] text-slate-600 hover:text-slate-400 transition w-5 h-5 flex items-center justify-center rounded">🔔</button>
+                <button onclick="timerMinimizeToggle()" title="Minimizar" class="text-[10px] text-slate-600 hover:text-slate-400 transition w-5 h-5 flex items-center justify-center rounded">▼</button>
             </div>
         </div>
         <div id="timerDisplay" class="text-4xl font-black tabular-nums text-center text-yellow-500 my-2 tracking-tight">30:00</div>
@@ -178,7 +186,7 @@
                 <p id="seedLabel" class="text-[10px] text-slate-600 uppercase tracking-widest mb-1.5 hidden">Orden de seed</p>
 
                 <!-- Player list with reorder -->
-                <div id="playerList" class="text-xs text-slate-500 mb-3 space-y-0.5 max-h-40 overflow-y-auto pr-1"></div>
+                <div id="playerList" class="text-xs text-slate-500 mb-3 space-y-0.5 max-h-40 overflow-y-auto pr-1" style="-webkit-overflow-scrolling:touch;overscroll-behavior:contain"></div>
 
                 <!-- Round count -->
                 <div class="flex items-center gap-3 mb-3 bg-slate-800/50 px-3 py-2 rounded-xl">
@@ -357,6 +365,8 @@ function toggleMute() {
 const T_MAIN = 30 * 60, T_EXT = 5 * 60;
 let tState = 'idle', tSecs = T_MAIN, tBase = 'main', tInterval = null;
 let _warn5Fired = false, _warn3Fired = false;
+let timerMinimized = false;
+function timerMinimizeToggle() { timerMinimized = !timerMinimized; renderTimer(); }
 
 function timerToggle() {
     if (tState === 'idle' || tState === 'done') {
@@ -402,6 +412,27 @@ function renderTimer() {
     const w = document.getElementById('timerWidget');
     if (!tournamentStarted || tournamentFinished) { w.classList.add('hidden'); return; }
     w.classList.remove('hidden');
+    // Handle minimized pill
+    const body = document.getElementById('timerBody');
+    const pill = document.getElementById('timerPill');
+    if (timerMinimized) {
+        body.classList.add('hidden'); pill.classList.remove('hidden');
+        // Update pill content
+        const mm = String(Math.floor(tSecs/60)).padStart(2,'0'), ss = String(tSecs%60).padStart(2,'0');
+        const pillTime = document.getElementById('timerPillTime');
+        const pillDot  = document.getElementById('timerPillDot');
+        const pillPhase = document.getElementById('timerPillPhase');
+        const active2 = tState === 'paused' ? tBase : tState.replace('running_', '');
+        pillTime.textContent = tState==='idle'?'30:00':tState==='done'?'FIN':`${mm}:${ss}`;
+        const urgent = tSecs < 60, warn = tSecs < 300;
+        if (active2 === 'ext') { pillTime.className='text-sm font-black tabular-nums text-orange-400'; pillDot.className='w-2 h-2 rounded-full bg-orange-500 flex-shrink-0'; pillPhase.textContent='Extra'; }
+        else if (active2 === 'turns') { pillTime.className='text-sm font-black tabular-nums text-purple-400'; pillDot.className='w-2 h-2 rounded-full bg-purple-500 flex-shrink-0'; pillPhase.textContent='Turnos'; }
+        else if (tState==='done') { pillTime.className='text-sm font-black tabular-nums text-slate-500'; pillDot.className='w-2 h-2 rounded-full bg-slate-600 flex-shrink-0'; pillPhase.textContent='Fin'; }
+        else { pillTime.className=`text-sm font-black tabular-nums ${urgent?'text-red-400 blink':warn?'text-yellow-400':'text-yellow-500'}`; pillDot.className=`w-2 h-2 rounded-full flex-shrink-0 ${urgent?'bg-red-500':warn?'bg-yellow-400':'bg-yellow-500'}`; pillPhase.textContent=`R${currentRound}`; }
+        w.className = 'fixed bottom-6 right-6 z-40 bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-800';
+        return;
+    }
+    body.classList.remove('hidden'); pill.classList.add('hidden');
     const disp   = document.getElementById('timerDisplay');
     const phase  = document.getElementById('timerPhase');
     const rLabel = document.getElementById('timerRound');
@@ -922,34 +953,35 @@ function showFinalResults() {
             <span class="text-slate-700 text-[10px] font-mono">${(p.omw*100).toFixed(1)}%</span>
         </div>`).join('');
 
-    // Matchup table (only if leaders are used)
-    const hasLeaders = players.some(p => p.leader);
+    // Matchup table grouped by round
     let matchupHtml = '';
-    if (hasLeaders) {
-        const map = {};
-        rounds.forEach(round => round.forEach(m => {
-            if (!m.winner || m.p2.id==='bye') return;
+    const roundMatchupSections = rounds.map((round, rIdx) => {
+        const rows = round.filter(m => m.winner && m.p2.id !== 'bye').map(m => {
             const wp = players.find(p=>p.id===(m.winner==='p1'?m.p1.id:m.p2.id));
             const lp = players.find(p=>p.id===(m.winner==='p1'?m.p2.id:m.p1.id));
-            if (!wp||!lp) return;
-            const wLabel = wp.leader ? `${wp.name} (${wp.leader})` : wp.name;
-            const lLabel = lp.leader ? `${lp.name} (${lp.leader})` : lp.name;
-            const [a,b,aId,bId] = wLabel<=lLabel ? [wLabel,lLabel,wp.id,lp.id] : [lLabel,wLabel,lp.id,wp.id];
-            const key = `${aId}§${bId}`;
-            if (!map[key]) map[key] = {a,b,aW:0,bW:0};
-            if (wp.id===aId) map[key].aW++; else map[key].bW++;
-        }));
-        const rows = Object.values(map).filter(r=>r.aW+r.bW>0).map(r => `
-            <div class="flex items-center justify-between px-3 py-1.5 rounded-lg hover:bg-slate-800/20 text-xs">
-                <span class="text-slate-400 truncate max-w-[40%]">${escapeHtml(r.a)}</span>
-                <span class="font-black text-slate-300 mx-2 flex-shrink-0">${r.aW} — ${r.bW}</span>
-                <span class="text-slate-400 truncate max-w-[40%] text-right">${escapeHtml(r.b)}</span>
-            </div>`).join('');
-        if (rows) matchupHtml = `
-            <div class="border-t border-slate-800 pt-4 mt-2">
-                <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Matchups</h3>
-                <div class="space-y-0.5">${rows}</div>
+            if (!wp||!lp) return '';
+            const wLabel = wp.leader ? `${escapeHtml(wp.name)} <span class="text-slate-600">(${escapeHtml(wp.leader)})</span>` : escapeHtml(wp.name);
+            const lLabel = lp.leader ? `${escapeHtml(lp.name)} <span class="text-slate-600">(${escapeHtml(lp.leader)})</span>` : escapeHtml(lp.name);
+            return `<div class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-800/20 text-xs">
+                <span class="text-green-400 flex-1 truncate">${wLabel}</span>
+                <span class="font-black text-slate-500 flex-shrink-0 text-[10px]">▶ T${m.table}</span>
+                <span class="text-slate-600 flex-1 truncate text-right">${lLabel}</span>
             </div>`;
+        }).filter(Boolean).join('');
+        if (!rows) return '';
+        return `<div class="mb-3">
+            <div class="text-[10px] font-black text-slate-600 uppercase tracking-widest px-1 mb-1">Ronda ${rIdx+1}</div>
+            ${rows}
+        </div>`;
+    }).filter(Boolean);
+    if (roundMatchupSections.length) {
+        matchupHtml = `<div class="border-t border-slate-800 pt-4 mt-2">
+            <button onclick="toggleMatchupSection()" class="w-full flex items-center justify-between text-xs font-black text-slate-500 uppercase tracking-widest mb-2 hover:text-slate-300 transition">
+                <span>⚔️ Matchups por ronda</span>
+                <span id="matchupSectionArrow">▼</span>
+            </button>
+            <div id="matchupSectionBody" class="space-y-0.5">${roundMatchupSections.join('')}</div>
+        </div>`;
     }
 
     // Post-session notes
@@ -993,6 +1025,13 @@ function showFinalResults() {
 function toggleNotesSection() {
     const body  = document.getElementById('notesSectionBody');
     const arrow = document.getElementById('notesSectionArrow');
+    if (!body) return;
+    const hidden = body.classList.toggle('hidden');
+    if (arrow) arrow.textContent = hidden ? '▼' : '▲';
+}
+function toggleMatchupSection() {
+    const body  = document.getElementById('matchupSectionBody');
+    const arrow = document.getElementById('matchupSectionArrow');
     if (!body) return;
     const hidden = body.classList.toggle('hidden');
     if (arrow) arrow.textContent = hidden ? '▼' : '▲';
@@ -1192,62 +1231,65 @@ function renderAnalytics() {
             body.innerHTML = '<p class="text-slate-600 text-sm text-center py-8">Sin datos de líderes disponibles.</p>';
             return;
         }
-        const rows = leaders.map(([ldr, s]) => {
-            const winPct = s.partidas > 0 ? ((s.wins/s.partidas)*100).toFixed(1) : '—';
-            // Best and worst matchup
+        // SVG donut helper (r=14, circumference≈87.96)
+        function donutChart(wins, total, color) {
+            if (!total) return `<svg width="36" height="36"><circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" stroke-width="4"/></svg>`;
+            const circ = 87.96, dash = (wins/total)*circ;
+            return `<svg width="36" height="36" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" stroke-width="4"/>
+                <circle cx="18" cy="18" r="14" fill="none" stroke="${color}" stroke-width="4"
+                    stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"
+                    transform="rotate(-90 18 18)"/>
+                <text x="18" y="22" text-anchor="middle" font-size="8" font-weight="900" fill="${color}">${Math.round(wins/total*100)}</text>
+            </svg>`;
+        }
+        const cards = leaders.map(([ldr, s]) => {
+            const winPct = s.partidas > 0 ? (s.wins/s.partidas) : 0;
+            const color = winPct >= 0.6 ? '#4ade80' : winPct >= 0.5 ? '#facc15' : '#f87171';
             const mups = Object.entries(s.matchups).filter(([,m])=>m.w+m.l>=1);
-            const best = mups.sort((a,b)=>(b[1].w/(b[1].w+b[1].l))-(a[1].w/(a[1].w+a[1].l)))[0];
-            const worst = [...mups].sort((a,b)=>(a[1].w/(a[1].w+a[1].l))-(b[1].w/(b[1].w+b[1].l)))[0];
-            return `<tr class="border-b border-slate-800/30 hover:bg-slate-800/20 transition text-xs">
-                <td class="py-2 font-mono text-yellow-400 font-bold">${escapeHtml(ldr)}</td>
-                <td class="py-2 text-center text-slate-300">${s.partidas}</td>
-                <td class="py-2 text-center text-green-400">${s.wins}</td>
-                <td class="py-2 text-center text-red-400">${s.losses}</td>
-                <td class="py-2 text-center font-bold ${s.wins/s.partidas>=0.5?'text-green-400':'text-red-400'}">${winPct}%</td>
-                <td class="py-2 text-slate-500 font-mono">${best?escapeHtml(best[0])+'('+best[1].w+'-'+best[1].l+')':'—'}</td>
-                <td class="py-2 text-slate-500 font-mono">${worst?escapeHtml(worst[0])+'('+worst[1].w+'-'+worst[1].l+')':'—'}</td>
-            </tr>`;
+            const best  = mups.length ? mups.sort((a,b)=>(b[1].w/(b[1].w+b[1].l))-(a[1].w/(a[1].w+a[1].l)))[0] : null;
+            const worst = mups.length ? [...mups].sort((a,b)=>(a[1].w/(a[1].w+a[1].l))-(b[1].w/(b[1].w+b[1].l)))[0] : null;
+            return `<div class="bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 border border-slate-700/30">
+                ${donutChart(s.wins, s.partidas, color)}
+                <div class="flex-1 min-w-0">
+                    <div class="font-black text-yellow-400 text-xs truncate">${escapeHtml(ldr)}</div>
+                    <div class="text-[10px] text-slate-500 mt-0.5">${s.partidas} partidas · <span style="color:${color}">${s.wins}W–${s.losses}L</span></div>
+                    ${best ? `<div class="text-[10px] text-slate-600 truncate">✅ ${escapeHtml(best[0])} (${best[1].w}-${best[1].l})</div>` : ''}
+                    ${worst && worst[0] !== best?.[0] ? `<div class="text-[10px] text-slate-600 truncate">❌ ${escapeHtml(worst[0])} (${worst[1].w}-${worst[1].l})</div>` : ''}
+                </div>
+            </div>`;
         }).join('');
-        body.innerHTML = `<div class="overflow-x-auto">
-            <table class="w-full">
-                <thead><tr class="text-slate-600 border-b border-slate-700 text-left text-[10px] uppercase">
-                    <th class="pb-2">Líder</th><th class="pb-2 text-center">Partidas</th>
-                    <th class="pb-2 text-center">W</th><th class="pb-2 text-center">L</th>
-                    <th class="pb-2 text-center">Win%</th>
-                    <th class="pb-2">Mejor matchup</th><th class="pb-2">Peor matchup</th>
-                </tr></thead>
-                <tbody>${rows}</tbody>
-            </table></div>`;
+        body.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${cards}</div>`;
     } else if (analyticsTab === 'jugadores') {
-        const players_ = Object.entries(playerStats).sort((a,b)=>b[1].partidas-a[1].partidas);
+        const players_ = Object.entries(playerStats).sort((a,b)=>b[1].wins-a[1].wins||b[1].partidas-a[1].partidas);
         if (!players_.length) {
             body.innerHTML = '<p class="text-slate-600 text-sm text-center py-8">Sin datos de jugadores disponibles.</p>';
             return;
         }
-        const rows = players_.map(([name, s]) => {
-            const winPct = s.partidas > 0 ? ((s.wins/s.partidas)*100).toFixed(1) : '—';
-            const topLeader = Object.entries(s.leaders).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
-            const sessions = s.sessions.size;
-            return `<tr class="border-b border-slate-800/30 hover:bg-slate-800/20 transition text-xs">
-                <td class="py-2 font-bold text-slate-200">${escapeHtml(name)}</td>
-                <td class="py-2 text-center text-slate-400">${sessions}</td>
-                <td class="py-2 text-center text-slate-300">${s.partidas}</td>
-                <td class="py-2 text-center text-green-400">${s.wins}</td>
-                <td class="py-2 text-center text-red-400">${s.losses}</td>
-                <td class="py-2 text-center font-bold ${s.partidas>0&&s.wins/s.partidas>=0.5?'text-green-400':'text-red-400'}">${winPct}%</td>
-                <td class="py-2 text-slate-500 font-mono">${escapeHtml(topLeader)}</td>
-            </tr>`;
+        const maxWins = Math.max(...players_.map(([,s])=>s.wins), 1);
+        const cards = players_.map(([name, s]) => {
+            const winPct = s.partidas > 0 ? ((s.wins/s.partidas)*100).toFixed(1) : '0.0';
+            const topLeader = Object.entries(s.leaders).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
+            const barW = Math.round((s.wins/maxWins)*100);
+            const barColor = s.partidas > 0 && s.wins/s.partidas >= 0.5 ? '#4ade80' : '#f87171';
+            return `<div class="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/30">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="font-black text-slate-200 text-sm">${escapeHtml(name)}</span>
+                    <div class="text-right">
+                        <span class="font-black text-xs" style="color:${barColor}">${winPct}%</span>
+                        <span class="text-[10px] text-slate-600 ml-1">(${s.wins}W–${s.losses}L)</span>
+                    </div>
+                </div>
+                <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full transition-all" style="width:${barW}%;background:${barColor}"></div>
+                </div>
+                <div class="flex justify-between mt-1.5 text-[10px] text-slate-600">
+                    <span>${s.partidas} partidas · ${s.sessions.size} sesión${s.sessions.size!==1?'es':''}</span>
+                    ${topLeader ? `<span class="truncate max-w-[55%] text-right text-slate-500">${escapeHtml(topLeader)}</span>` : ''}
+                </div>
+            </div>`;
         }).join('');
-        body.innerHTML = `<div class="overflow-x-auto">
-            <table class="w-full">
-                <thead><tr class="text-slate-600 border-b border-slate-700 text-left text-[10px] uppercase">
-                    <th class="pb-2">Jugador</th><th class="pb-2 text-center">Sesiones</th>
-                    <th class="pb-2 text-center">Partidas</th>
-                    <th class="pb-2 text-center">W</th><th class="pb-2 text-center">L</th>
-                    <th class="pb-2 text-center">Win%</th><th class="pb-2">Líder más usado</th>
-                </tr></thead>
-                <tbody>${rows}</tbody>
-            </table></div>`;
+        body.innerHTML = `<div class="space-y-2">${cards}</div>`;
     } else if (analyticsTab === 'matchups') {
         const matchups = Object.values(matchupStats).sort((a,b)=>(b.aW+b.bW)-(a.aW+a.bW));
         if (!matchups.length) {
