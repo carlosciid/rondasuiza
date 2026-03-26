@@ -15,17 +15,17 @@
         @keyframes slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(110%); } }
         .toast-in  { animation: slideIn 0.22s ease forwards; }
         .toast-out { animation: slideOut 0.22s ease forwards; }
-        .sel-blue { background:#1e3a5f !important; color:#60a5fa !important; border-color:#2563eb !important; }
+        .sel-blue  { background:#1e3a5f !important; color:#60a5fa !important; border-color:#2563eb !important; }
         .sel-green { background:#14532d !important; color:#4ade80 !important; border-color:#16a34a !important; }
-        .sel-red  { background:#4c0519 !important; color:#f87171 !important; border-color:#b91c1c !important; }
+        .sel-red   { background:#4c0519 !important; color:#f87171 !important; border-color:#b91c1c !important; }
+        .sel-tag   { background:#312e81 !important; color:#a5b4fc !important; border-color:#4338ca !important; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen pb-16">
 
-<!-- ── Toasts ── -->
 <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none w-72"></div>
 
-<!-- ── Confirm Modal ── -->
+<!-- Confirm Modal -->
 <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
     <div class="relative bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -37,30 +37,58 @@
     </div>
 </div>
 
+<!-- Goal Modal -->
+<div id="goalModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeGoalModal()"></div>
+    <div class="relative bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+        <h3 class="text-sm font-black text-yellow-500 uppercase tracking-wider">🎯 Meta de sesión</h3>
+        <div>
+            <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-1">Win rate objetivo (%)</label>
+            <input id="goalTarget" type="number" min="1" max="100" placeholder="Ej: 60"
+                class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm">
+        </div>
+        <div>
+            <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-2">Período</label>
+            <div class="grid grid-cols-3 gap-2">
+                <button id="gp-week"  onclick="selectGoalPeriod('week')"  class="py-2 rounded-xl border text-xs font-black transition bg-slate-800 text-slate-500 border-slate-700">Esta semana</button>
+                <button id="gp-month" onclick="selectGoalPeriod('month')" class="py-2 rounded-xl border text-xs font-black transition bg-slate-800 text-slate-500 border-slate-700">Este mes</button>
+                <button id="gp-all"   onclick="selectGoalPeriod('all')"   class="py-2 rounded-xl border text-xs font-black transition bg-slate-800 text-slate-500 border-slate-700">Todo</button>
+            </div>
+        </div>
+        <div class="flex gap-2 pt-1">
+            <button onclick="closeGoalModal()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition text-sm">Cancelar</button>
+            <button id="goalClearBtn" onclick="clearGoal()" class="hidden px-4 py-2.5 rounded-xl bg-red-900/40 hover:bg-red-900/70 text-red-400 font-bold transition text-sm">Quitar</button>
+            <button onclick="saveGoal()" class="flex-1 py-2.5 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black transition text-sm">Guardar</button>
+        </div>
+    </div>
+</div>
+
 <div class="max-w-5xl mx-auto p-4 md:p-6">
 
-    <!-- ── Header ── -->
-    <header class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-2xl">
-        <div class="text-center md:text-left">
-            <h1 class="text-2xl font-black text-yellow-500 uppercase tracking-tighter">Training Log</h1>
-            <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mt-0.5">Registro de entrenamiento en solitario</p>
+    <!-- Header -->
+    <header class="mb-6 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-2xl">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div>
+                <h1 class="text-2xl font-black text-yellow-500 uppercase tracking-tighter">Training Log</h1>
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mt-0.5">Registro de entrenamiento en solitario</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <div id="headerStats" class="flex flex-wrap gap-1.5"></div>
+                <button onclick="openGoalModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">🎯 Meta</button>
+                <button onclick="exportData()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">⬇️ Descargar</button>
+                <label class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50 cursor-pointer">⬆️ Cargar<input type="file" class="hidden" accept=".json" onchange="importData(event)"></label>
+                <a href="index.html" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">⚓ Torneos</a>
+            </div>
         </div>
-        <div class="flex flex-wrap items-center justify-center gap-2">
-            <span id="headerBadge" class="text-xs bg-slate-800 px-3 py-1.5 rounded-full text-slate-400 font-mono">0 partidas</span>
-            <button onclick="exportData()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">⬇️ Descargar</button>
-            <label class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50 cursor-pointer">
-                ⬆️ Cargar
-                <input type="file" class="hidden" accept=".json" onchange="importData(event)">
-            </label>
-            <a href="index.html" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">⚓ Torneos</a>
-        </div>
+        <div id="goalProgress" class="hidden mt-3 pt-3 border-t border-slate-800/60"></div>
     </header>
 
-    <!-- ── Main Tabs ── -->
+    <!-- Tabs -->
     <div class="flex gap-1 mb-4 bg-slate-900 p-1 rounded-xl border border-slate-800">
         <button id="tabLog"     onclick="setView('log')"     class="flex-1 py-2 rounded-lg text-xs font-black transition bg-slate-700 text-slate-200">✏️ Registrar</button>
         <button id="tabStats"   onclick="setView('stats')"   class="flex-1 py-2 rounded-lg text-xs font-black transition text-slate-500">📊 Estadísticas</button>
         <button id="tabHistory" onclick="setView('history')" class="flex-1 py-2 rounded-lg text-xs font-black transition text-slate-500">📋 Historial</button>
+        <button id="tabTorneo"  onclick="setView('torneo')"  class="flex-1 py-2 rounded-lg text-xs font-black transition text-slate-500">🏆 Torneo</button>
     </div>
 
     <div id="mainContent"></div>
@@ -71,13 +99,27 @@
 let matches = [];
 let view = 'log', statsTab = 'general';
 let expandedLider = null, expandedOpp = null;
-let formTurn = null, formResult = null;
+let formTurn = null, formResult = null, formTags = new Set();
 let histFilterLeader = '', histFilterOpp = '', histFilterResult = '';
+let editingMatchId = null;
+let statsFilterLeader = '';
+let goal = null, goalPeriodSel = 'week';
+let quickMatches = [], qtTurn = null, qtResult = null;
+
+const TAG_DEFS = [
+    {id:'time',       label:'⏱ Tiempo'},
+    {id:'err',        label:'🤦 Error propio'},
+    {id:'rival',      label:'👏 Gran rival'},
+    {id:'hand',       label:'🎲 Mala mano'},
+    {id:'learn',      label:'📚 Aprendí'},
+    {id:'tournament', label:'🏆 Torneo'},
+];
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────────
 function saveData() { localStorage.setItem('opTcgTraining', JSON.stringify(matches)); }
 function loadData() {
     try { matches = JSON.parse(localStorage.getItem('opTcgTraining') || '[]'); } catch { matches = []; }
+    try { goal = JSON.parse(localStorage.getItem('opTcgGoal') || 'null'); } catch { goal = null; }
     updateHeader();
 }
 function getKnownLeaders() {
@@ -88,71 +130,118 @@ function getKnownLeaders() {
 function updateHeader() {
     const w = matches.filter(m => m.result === 'win').length;
     const pct = matches.length ? Math.round(w / matches.length * 100) : 0;
-    document.getElementById('headerBadge').textContent = `${matches.length} partida${matches.length !== 1 ? 's' : ''} · ${pct}% W`;
-}
-
-// ── VIEW ROUTING ──────────────────────────────────────────────────────────────
-function setView(v) {
-    view = v;
-    ['log','stats','history'].forEach(t => {
-        const btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
-        btn.className = `flex-1 py-2 rounded-lg text-xs font-black transition ${t === v ? 'bg-slate-700 text-slate-200' : 'text-slate-500'}`;
-    });
-    render();
-}
-function setStatsTab(t) { statsTab = t; expandedLider = null; expandedOpp = null; render(); }
-function render() {
-    const el = document.getElementById('mainContent');
-    if (view === 'log')     el.innerHTML = renderLog();
-    if (view === 'stats')   el.innerHTML = renderStats();
-    if (view === 'history') el.innerHTML = renderHistory();
-}
-
-// ── LOG VIEW ──────────────────────────────────────────────────────────────────
-function renderLog() {
-    const leaders = getKnownLeaders();
-    const opts = leaders.map(l => `<option value="${escapeHtml(l)}">`).join('');
-    const recent = matches.slice(-10);
-    const formDots = recent.map(m => `<span class="w-2 h-2 rounded-full inline-block cursor-default ${m.result==='win'?'bg-green-500':'bg-red-500'}" title="${m.result==='win'?'W':'L'} vs ${escapeHtml(m.oppLeader)}"></span>`).join('');
     let streak = 0, streakType = '';
     for (let i = matches.length - 1; i >= 0; i--) {
         if (!streak) { streakType = matches[i].result; streak = 1; }
         else if (matches[i].result === streakType) streak++;
         else break;
     }
-    const streakHtml = streak > 0 ? `<span class="font-black text-sm ${streakType==='win'?'text-green-400':'text-red-400'}">${streak}${streakType==='win'?'W':'L'} racha</span>` : '';
     const today = new Date().toISOString().split('T')[0];
     const todayM = matches.filter(m => m.date.startsWith(today));
     const todayW = todayM.filter(m => m.result === 'win').length;
+    const el = document.getElementById('headerStats');
+    if (!el) return;
+    const b = [];
+    b.push(`<span class="text-xs bg-slate-800 px-2.5 py-1 rounded-full text-slate-400 font-mono">${matches.length} partidas · ${pct}%W</span>`);
+    if (streak >= 2) b.push(`<span class="text-xs px-2.5 py-1 rounded-full font-black border ${streakType==='win'?'bg-green-900/40 text-green-400 border-green-700/40':'bg-red-900/40 text-red-400 border-red-700/40'}">${streak}${streakType==='win'?'W':'L'} racha</span>`);
+    if (todayM.length) b.push(`<span class="text-xs bg-blue-900/30 border border-blue-700/30 px-2.5 py-1 rounded-full text-blue-300 font-mono">Hoy: ${todayW}W/${todayM.length-todayW}L</span>`);
+    el.innerHTML = b.join('');
+    updateGoalProgress();
+}
+function updateGoalProgress() {
+    const el = document.getElementById('goalProgress');
+    if (!el) return;
+    if (!goal || !matches.length) { el.classList.add('hidden'); return; }
+    let pm = matches;
+    const now = new Date();
+    if (goal.period === 'week') { const wa = new Date(now); wa.setDate(wa.getDate()-7); pm = matches.filter(m=>new Date(m.date)>=wa); }
+    else if (goal.period === 'month') { const ms = now.toISOString().slice(0,7); pm = matches.filter(m=>m.date.startsWith(ms)); }
+    if (!pm.length) { el.classList.add('hidden'); return; }
+    const gw = pm.filter(m=>m.result==='win').length;
+    const pct = Math.round(gw/pm.length*100);
+    const bar = Math.min(100, Math.round(pct/goal.target*100));
+    const col = pct>=goal.target ? '#4ade80' : pct>=goal.target*0.8 ? '#facc15' : '#f87171';
+    const label = goal.period==='week'?'Esta semana':goal.period==='month'?'Este mes':'Total';
+    el.classList.remove('hidden');
+    el.innerHTML = `<div class="bg-slate-800/40 border border-slate-700/40 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[10px] text-slate-500 font-black uppercase tracking-wider">🎯 Meta ${goal.target}%W · ${label}</span>
+            <span class="text-xs font-black" style="color:${col}">${pct>=goal.target?'✓ ':''}${pct}% / ${goal.target}%</span>
+        </div>
+        <div class="h-2 bg-slate-700 rounded-full overflow-hidden"><div class="h-full rounded-full transition-all" style="width:${bar}%;background:${col}"></div></div>
+        <div class="text-[9px] text-slate-700 mt-1">${gw}W · ${pm.length-gw}L · ${pm.length} partidas en período</div>
+    </div>`;
+}
+
+// ── VIEW ROUTING ──────────────────────────────────────────────────────────────
+function setView(v) {
+    view = v;
+    if (v !== 'log') editingMatchId = null;
+    ['log','stats','history','torneo'].forEach(t => {
+        const btn = document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1));
+        if (btn) btn.className = `flex-1 py-2 rounded-lg text-xs font-black transition ${t===v?'bg-slate-700 text-slate-200':'text-slate-500'}`;
+    });
+    render();
+}
+function setStatsTab(t) { statsTab=t; expandedLider=null; expandedOpp=null; render(); }
+function render() {
+    const el = document.getElementById('mainContent');
+    if (view==='log')     el.innerHTML = renderLog();
+    if (view==='stats')   el.innerHTML = renderStats();
+    if (view==='history') el.innerHTML = renderHistory();
+    if (view==='torneo')  el.innerHTML = renderTorneo();
+    if (view==='log') initFormState();
+}
+
+// ── LOG VIEW ──────────────────────────────────────────────────────────────────
+function renderLog() {
+    const leaders = getKnownLeaders();
+    const opts = leaders.map(l=>`<option value="${escapeHtml(l)}">`).join('');
+    const editM = editingMatchId ? matches.find(m=>m.id===editingMatchId) : null;
+    const recent = matches.slice(-10);
+    const formDots = recent.map(m=>`<span class="w-2 h-2 rounded-full inline-block ${m.result==='win'?'bg-green-500':'bg-red-500'}" title="${m.result==='win'?'W':'L'} vs ${escapeHtml(m.oppLeader)}"></span>`).join('');
+    let streak=0, streakType='';
+    for (let i=matches.length-1;i>=0;i--) {
+        if(!streak){streakType=matches[i].result;streak=1;}
+        else if(matches[i].result===streakType)streak++;
+        else break;
+    }
+    const streakHtml = streak>0?`<span class="font-black text-sm ${streakType==='win'?'text-green-400':'text-red-400'}">${streak}${streakType==='win'?'W':'L'} racha</span>`:'';
+    const today=new Date().toISOString().split('T')[0];
+    const todayM=matches.filter(m=>m.date.startsWith(today));
+    const todayW=todayM.filter(m=>m.result==='win').length;
+    const tagBtns = TAG_DEFS.filter(t=>t.id!=='tournament').map(t=>`<button id="tag-${t.id}" onclick="toggleTag('${t.id}')" class="px-2.5 py-1.5 rounded-lg border text-[10px] font-black transition bg-slate-800 text-slate-500 border-slate-700">${t.label}</button>`).join('');
 
     return `
     <datalist id="leaderOpts">${opts}</datalist>
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
-
-        <!-- ── Form ── -->
         <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <h2 class="text-sm font-black text-yellow-500 uppercase tracking-wider">Nueva Partida</h2>
-
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-black text-yellow-500 uppercase tracking-wider">${editM?'✏️ Editar':'Nueva Partida'}</h2>
+                ${editM?`<button onclick="cancelEdit()" class="text-xs text-slate-600 hover:text-slate-400 font-black">✕ Cancelar</button>`:''}
+            </div>
             <div>
                 <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-1">Tu Líder</label>
-                <input id="fMyLeader" list="leaderOpts" placeholder="Ej: Luffy OP-09"
+                <input id="fMyLeader" list="leaderOpts" placeholder="Ej: Luffy OP-09" value="${editM?escapeHtml(editM.myLeader):''}"
                     class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm">
             </div>
-
+            <div>
+                <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-1">Variante / Deck (opcional)</label>
+                <input id="fDeckVariant" placeholder="Ej: Aggro, Control, Rush..." value="${editM?escapeHtml(editM.deckVariant||''):''}"
+                    class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm text-slate-400">
+            </div>
             <div>
                 <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-1">Líder Oponente</label>
-                <input id="fOppLeader" list="leaderOpts" placeholder="Ej: Enel OP-03"
+                <input id="fOppLeader" list="leaderOpts" placeholder="Ej: Enel OP-03" value="${editM?escapeHtml(editM.oppLeader):''}"
                     class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm">
             </div>
-
             <div>
                 <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-2">🎲 Turno inicial</label>
                 <div class="flex gap-2">
-                    <button id="btn1ro"  onclick="selectTurn('first')"  class="flex-1 py-2.5 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">1ro 🟦</button>
-                    <button id="btn2do"  onclick="selectTurn('second')" class="flex-1 py-2.5 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">2do ⬜</button>
+                    <button id="btn1ro" onclick="selectTurn('first')"  class="flex-1 py-2.5 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">1ro 🟦</button>
+                    <button id="btn2do" onclick="selectTurn('second')" class="flex-1 py-2.5 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">2do ⬜</button>
                 </div>
             </div>
-
             <div>
                 <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-2">Resultado</label>
                 <div class="flex gap-2">
@@ -160,19 +249,20 @@ function renderLog() {
                     <button id="btnLoss" onclick="selectResult('loss')" class="flex-1 py-2.5 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">💀 Derrota</button>
                 </div>
             </div>
-
+            <div>
+                <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-2">Etiquetas (opcional)</label>
+                <div class="flex flex-wrap gap-1.5">${tagBtns}</div>
+            </div>
             <div>
                 <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-1">Notas (opcional)</label>
                 <textarea id="fNotes" rows="2" placeholder="Reflexiones, jugadas clave..."
-                    class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm resize-none text-slate-400"></textarea>
+                    class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm resize-none text-slate-400">${editM?escapeHtml(editM.notes||''):''}</textarea>
             </div>
-
             <button onclick="addMatch()" class="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black rounded-xl uppercase transition text-sm">
-                + Registrar Partida
+                ${editM?'💾 Guardar cambios':'+ Registrar Partida'}
             </button>
         </div>
 
-        <!-- ── Quick Stats ── -->
         <div class="lg:col-span-3 space-y-4">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                 <div class="flex items-center justify-between mb-3">
@@ -180,29 +270,27 @@ function renderLog() {
                     ${streakHtml}
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                    ${qCard(matches.length, 'Total', '#94a3b8')}
-                    ${qCard(matches.filter(m=>m.result==='win').length, 'Victorias', '#4ade80')}
-                    ${qCard(matches.filter(m=>m.result==='loss').length, 'Derrotas', '#f87171')}
-                    ${qCard(matches.length ? Math.round(matches.filter(m=>m.result==='win').length/matches.length*100)+'%' : '—', 'Win%', matches.length ? mrColor(matches.filter(m=>m.result==='win').length, matches.length) : '#64748b')}
+                    ${qCard(matches.length,'Total','#94a3b8')}
+                    ${qCard(matches.filter(m=>m.result==='win').length,'Victorias','#4ade80')}
+                    ${qCard(matches.filter(m=>m.result==='loss').length,'Derrotas','#f87171')}
+                    ${qCard(matches.length?Math.round(matches.filter(m=>m.result==='win').length/matches.length*100)+'%':'—','Win%',matches.length?mrColor(matches.filter(m=>m.result==='win').length,matches.length):'#64748b')}
                 </div>
-                ${recent.length ? `<div class="text-[9px] text-slate-700 uppercase tracking-widest mb-1.5">Últimas ${recent.length}</div><div class="flex items-center gap-1">${formDots}</div>` : ''}
+                ${recent.length?`<div class="text-[9px] text-slate-700 uppercase tracking-widest mb-1.5">Últimas ${recent.length}</div><div class="flex items-center gap-1">${formDots}</div>`:''}
             </div>
-
-            ${todayM.length ? `
+            ${todayM.length?`
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                 <div class="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">📅 Hoy</div>
                 <div class="grid grid-cols-3 gap-3">
-                    ${qCard(todayM.length, 'Jugadas', '#94a3b8')}
-                    ${qCard(todayW, 'Victorias', '#4ade80')}
-                    ${qCard(todayM.length ? Math.round(todayW/todayM.length*100)+'%' : '—', 'Win%', mrColor(todayW, todayM.length))}
+                    ${qCard(todayM.length,'Jugadas','#94a3b8')}
+                    ${qCard(todayW,'Victorias','#4ade80')}
+                    ${qCard(todayM.length?Math.round(todayW/todayM.length*100)+'%':'—','Win%',mrColor(todayW,todayM.length))}
                 </div>
-            </div>` : ''}
-
-            ${matches.length ? `
+            </div>`:''}
+            ${matches.length?`
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                 <div class="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Últimas partidas</div>
                 <div class="space-y-1">
-                    ${matches.slice(-6).reverse().map(m => `
+                    ${matches.slice(-6).reverse().map(m=>`
                     <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/50">
                         <span class="w-2 h-2 rounded-full flex-shrink-0 ${m.result==='win'?'bg-green-500':'bg-red-500'}"></span>
                         <span class="text-xs font-bold text-yellow-400 truncate flex-1">${escapeHtml(m.myLeader||'?')}</span>
@@ -212,7 +300,7 @@ function renderLog() {
                         <span class="text-[10px] font-black flex-shrink-0 ${m.result==='win'?'text-green-400':'text-red-400'}">${m.result==='win'?'W':'L'}</span>
                     </div>`).join('')}
                 </div>
-            </div>` : `
+            </div>`:`
             <div class="bg-slate-900 border-2 border-dashed border-slate-800 rounded-2xl p-10 text-center">
                 <p class="text-4xl mb-3">⚓</p>
                 <p class="text-sm font-bold text-slate-600 uppercase tracking-widest">Sin partidas aún</p>
@@ -221,7 +309,6 @@ function renderLog() {
         </div>
     </div>`;
 }
-
 function qCard(val, label, color) {
     return `<div class="bg-slate-800/50 rounded-xl p-3 text-center border border-slate-800">
         <div class="text-xl font-black" style="color:${color}">${val}</div>
@@ -238,42 +325,87 @@ function selectTurn(t) {
 function selectResult(r) {
     formResult = r;
     document.getElementById('btnWin').className  = `flex-1 py-2.5 rounded-xl border text-sm font-black transition ${r==='win' ?'sel-green':'bg-slate-800 text-slate-500 border-slate-700'}`;
-    document.getElementById('btnLoss').className = `flex-1 py-2.5 rounded-xl border text-sm font-black transition ${r==='loss'?'sel-red':'bg-slate-800 text-slate-500 border-slate-700'}`;
+    document.getElementById('btnLoss').className = `flex-1 py-2.5 rounded-xl border text-sm font-black transition ${r==='loss'?'sel-red'  :'bg-slate-800 text-slate-500 border-slate-700'}`;
 }
-
+function toggleTag(id) {
+    if (formTags.has(id)) formTags.delete(id); else formTags.add(id);
+    const btn = document.getElementById('tag-'+id);
+    if (btn) btn.className = `px-2.5 py-1.5 rounded-lg border text-[10px] font-black transition ${formTags.has(id)?'sel-tag':'bg-slate-800 text-slate-500 border-slate-700'}`;
+}
+function initFormState() {
+    if (formTurn) selectTurn(formTurn);
+    if (formResult) selectResult(formResult);
+    formTags.forEach(t => {
+        const btn = document.getElementById('tag-'+t);
+        if (btn) btn.className = 'px-2.5 py-1.5 rounded-lg border text-[10px] font-black transition sel-tag';
+    });
+}
 function addMatch() {
-    const myLeader  = document.getElementById('fMyLeader').value.trim();
-    const oppLeader = document.getElementById('fOppLeader').value.trim();
-    const notes     = document.getElementById('fNotes').value.trim();
-    if (!myLeader)   { showToast('Ingresa tu líder.', 'warning'); return; }
-    if (!oppLeader)  { showToast('Ingresa el líder oponente.', 'warning'); return; }
-    if (!formTurn)   { showToast('Selecciona quién fue primero.', 'warning'); return; }
-    if (!formResult) { showToast('Selecciona el resultado.', 'warning'); return; }
-    matches.push({ id: Date.now(), date: new Date().toISOString(), myLeader, oppLeader, turnOrder: formTurn, result: formResult, notes });
+    const myLeader    = document.getElementById('fMyLeader').value.trim();
+    const deckVariant = document.getElementById('fDeckVariant').value.trim();
+    const oppLeader   = document.getElementById('fOppLeader').value.trim();
+    const notes       = document.getElementById('fNotes').value.trim();
+    if (!myLeader)   { showToast('Ingresa tu líder.','warning'); return; }
+    if (!oppLeader)  { showToast('Ingresa el líder oponente.','warning'); return; }
+    if (!formTurn)   { showToast('Selecciona quién fue primero.','warning'); return; }
+    if (!formResult) { showToast('Selecciona el resultado.','warning'); return; }
+
+    if (editingMatchId) {
+        const idx = matches.findIndex(m=>m.id===editingMatchId);
+        if (idx !== -1) matches[idx] = {...matches[idx], myLeader, deckVariant, oppLeader, turnOrder:formTurn, result:formResult, notes, tags:[...formTags]};
+        editingMatchId = null;
+        formTurn=null; formResult=null; formTags=new Set();
+        saveData(); updateHeader();
+        showToast('Partida actualizada.','success');
+        render(); return;
+    }
+
+    matches.push({id:Date.now(), date:new Date().toISOString(), myLeader, deckVariant, oppLeader, turnOrder:formTurn, result:formResult, notes, tags:[...formTags]});
     const res = formResult;
     saveData(); updateHeader();
-    document.getElementById('fMyLeader').value = '';
-    document.getElementById('fOppLeader').value = '';
-    document.getElementById('fNotes').value = '';
-    formTurn = null; formResult = null;
-    showToast(`${res==='win'?'¡Victoria!':'Derrota'} vs ${oppLeader} registrada.`, res==='win'?'success':'info');
+    document.getElementById('fMyLeader').value='';
+    document.getElementById('fDeckVariant').value='';
+    document.getElementById('fOppLeader').value='';
+    document.getElementById('fNotes').value='';
+    formTurn=null; formResult=null; formTags=new Set();
+    showToast(`${res==='win'?'¡Victoria!':'Derrota'} registrada.`, res==='win'?'success':'info');
     render();
 }
-
+function startEdit(id) {
+    const m = matches.find(x=>x.id===id);
+    if (!m) return;
+    editingMatchId = id;
+    formTurn = m.turnOrder;
+    formResult = m.result;
+    formTags = new Set(m.tags||[]);
+    setView('log');
+}
+function cancelEdit() {
+    editingMatchId=null; formTurn=null; formResult=null; formTags=new Set();
+    render();
+}
 async function deleteMatch(id) {
-    const ok = await showConfirm('¿Eliminar esta partida?', 'Eliminar', true);
+    const ok = await showConfirm('¿Eliminar esta partida?','Eliminar',true);
     if (!ok) return;
-    matches = matches.filter(m => m.id !== id);
+    matches = matches.filter(m=>m.id!==id);
     saveData(); updateHeader(); render();
 }
 
 // ── STATS VIEW ────────────────────────────────────────────────────────────────
 function renderStats() {
-    if (!matches.length) return noDataPlaceholder('📊', 'Sin datos aún', 'Registra partidas para ver estadísticas');
+    if (!matches.length) return noDataPlaceholder('📊','Sin datos aún','Registra partidas para ver estadísticas');
+    const myLeadersList = [...new Set(matches.map(m=>m.myLeader).filter(Boolean))].sort();
     const s = buildStats();
     return `
+    <div class="flex items-center gap-2 mb-3">
+        <select onchange="statsFilterLeader=this.value;render()" class="bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-slate-400 outline-none focus:border-yellow-600 flex-1 md:flex-none md:w-56">
+            <option value="">Todos los líderes</option>
+            ${myLeadersList.map(l=>`<option value="${escapeHtml(l)}" ${statsFilterLeader===l?'selected':''}>${escapeHtml(l)}</option>`).join('')}
+        </select>
+        ${statsFilterLeader?`<span class="text-xs text-yellow-400 font-black truncate">${escapeHtml(statsFilterLeader)}</span><button onclick="statsFilterLeader='';render()" class="text-[10px] text-slate-600 hover:text-slate-400 font-black">✕</button>`:''}
+    </div>
     <div class="flex gap-1 mb-4 bg-slate-900 p-1 rounded-xl border border-slate-800">
-        ${[['general','🏠 General'],['lideres','⚓ Mis Líderes'],['oponentes','🎯 Oponentes'],['matchups','⚔️ Matchups']].map(([t,l])=>`
+        ${[['general','🏠 General'],['lideres','⚓ Líderes'],['oponentes','🎯 Oponentes'],['matchups','⚔️ Matchups']].map(([t,l])=>`
         <button onclick="setStatsTab('${t}')" class="flex-1 py-1.5 rounded-lg text-[10px] font-black transition ${statsTab===t?'bg-slate-700 text-slate-200':'text-slate-500'}">${l}</button>`).join('')}
     </div>
     ${statsTab==='general'   ? renderGeneral(s)   : ''}
@@ -283,94 +415,74 @@ function renderStats() {
 }
 
 function buildStats() {
-    const total = matches.length;
-    const wins  = matches.filter(m => m.result==='win').length;
-    const firstM  = matches.filter(m => m.turnOrder==='first');
-    const secondM = matches.filter(m => m.turnOrder==='second');
-    const firstW  = firstM.filter(m => m.result==='win').length;
-    const secondW = secondM.filter(m => m.result==='win').length;
-
-    // Streaks
-    let curStreak=0, curType='', bestWin=0, bestLoss=0, runW=0, runL=0;
-    matches.forEach(m => {
-        if (!curStreak) { curStreak=1; curType=m.result; }
-        else if (m.result===curType) curStreak++;
-        else { curStreak=1; curType=m.result; }
-        if (m.result==='win')  { runL=0; runW++; bestWin=Math.max(bestWin,runW); }
-        else                   { runW=0; runL++; bestLoss=Math.max(bestLoss,runL); }
+    const src = statsFilterLeader ? matches.filter(m=>m.myLeader===statsFilterLeader) : matches;
+    const total = src.length;
+    const wins  = src.filter(m=>m.result==='win').length;
+    const firstM  = src.filter(m=>m.turnOrder==='first');
+    const secondM = src.filter(m=>m.turnOrder==='second');
+    const firstW  = firstM.filter(m=>m.result==='win').length;
+    const secondW = secondM.filter(m=>m.result==='win').length;
+    let curStreak=0,curType='',bestWin=0,bestLoss=0,runW=0,runL=0;
+    src.forEach(m=>{
+        if(!curStreak){curStreak=1;curType=m.result;}
+        else if(m.result===curType)curStreak++;
+        else{curStreak=1;curType=m.result;}
+        if(m.result==='win'){runL=0;runW++;bestWin=Math.max(bestWin,runW);}
+        else{runW=0;runL++;bestLoss=Math.max(bestLoss,runL);}
     });
-
-    // By month
-    const byMonth = {};
-    matches.forEach(m => {
-        const k = m.date.slice(0,7);
-        if (!byMonth[k]) byMonth[k]={p:0,w:0};
-        byMonth[k].p++; if (m.result==='win') byMonth[k].w++;
-    });
-
-    // By weekday
-    const byDay = Array(7).fill(null).map(()=>({p:0,w:0}));
-    matches.forEach(m => { const d=new Date(m.date).getDay(); byDay[d].p++; if(m.result==='win')byDay[d].w++; });
-
-    // By my leader
-    const byMyLeader = {};
-    matches.forEach(m => {
-        const l = m.myLeader||'?';
-        if (!byMyLeader[l]) byMyLeader[l]={p:0,w:0,first:0,firstW:0,second:0,secondW:0,vsOpps:{}};
-        byMyLeader[l].p++; if(m.result==='win')byMyLeader[l].w++;
+    const byMonth={};
+    src.forEach(m=>{const k=m.date.slice(0,7);if(!byMonth[k])byMonth[k]={p:0,w:0};byMonth[k].p++;if(m.result==='win')byMonth[k].w++;});
+    const byDay=Array(7).fill(null).map(()=>({p:0,w:0}));
+    src.forEach(m=>{const d=new Date(m.date).getDay();byDay[d].p++;if(m.result==='win')byDay[d].w++;});
+    const byMyLeader={};
+    src.forEach(m=>{
+        const l=m.myLeader||'?';
+        if(!byMyLeader[l])byMyLeader[l]={p:0,w:0,first:0,firstW:0,second:0,secondW:0,vsOpps:{},decks:{}};
+        byMyLeader[l].p++;if(m.result==='win')byMyLeader[l].w++;
         if(m.turnOrder==='first'){byMyLeader[l].first++;if(m.result==='win')byMyLeader[l].firstW++;}
         else{byMyLeader[l].second++;if(m.result==='win')byMyLeader[l].secondW++;}
-        const opp = m.oppLeader||'?';
+        const opp=m.oppLeader||'?';
         if(!byMyLeader[l].vsOpps[opp])byMyLeader[l].vsOpps[opp]={p:0,w:0,first:0,firstW:0,second:0,secondW:0};
-        byMyLeader[l].vsOpps[opp].p++; if(m.result==='win')byMyLeader[l].vsOpps[opp].w++;
+        byMyLeader[l].vsOpps[opp].p++;if(m.result==='win')byMyLeader[l].vsOpps[opp].w++;
         if(m.turnOrder==='first'){byMyLeader[l].vsOpps[opp].first++;if(m.result==='win')byMyLeader[l].vsOpps[opp].firstW++;}
         else{byMyLeader[l].vsOpps[opp].second++;if(m.result==='win')byMyLeader[l].vsOpps[opp].secondW++;}
+        if(m.deckVariant){if(!byMyLeader[l].decks[m.deckVariant])byMyLeader[l].decks[m.deckVariant]={p:0,w:0};byMyLeader[l].decks[m.deckVariant].p++;if(m.result==='win')byMyLeader[l].decks[m.deckVariant].w++;}
     });
-
-    // By opponent
-    const byOpp = {};
-    matches.forEach(m => {
+    const byOpp={};
+    src.forEach(m=>{
         const l=m.oppLeader||'?';
         if(!byOpp[l])byOpp[l]={p:0,w:0,first:0,firstW:0,second:0,secondW:0};
         byOpp[l].p++;if(m.result==='win')byOpp[l].w++;
         if(m.turnOrder==='first'){byOpp[l].first++;if(m.result==='win')byOpp[l].firstW++;}
         else{byOpp[l].second++;if(m.result==='win')byOpp[l].secondW++;}
     });
-
-    return { total, wins, losses:total-wins, firstM, secondM, firstW, secondW, curStreak, curType, bestWin, bestLoss, byMonth, byDay, byMyLeader, byOpp };
+    return {total,wins,losses:total-wins,firstM,secondM,firstW,secondW,curStreak,curType,bestWin,bestLoss,byMonth,byDay,byMyLeader,byOpp,src};
 }
 
 function renderGeneral(s) {
-    const col = mrColor(s.wins, s.total);
-    const wPct = s.total ? Math.round(s.wins/s.total*100) : 0;
-    const fPct = s.firstM.length  ? Math.round(s.firstW/s.firstM.length*100)   : null;
-    const sPct = s.secondM.length ? Math.round(s.secondW/s.secondM.length*100) : null;
-    const dayNames = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-
-    const monthRows = Object.entries(s.byMonth).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,8).map(([k,v])=>{
-        const pct=Math.round(v.w/v.p*100), c=mrColor(v.w,v.p);
-        return `<div class="flex items-center gap-2 py-1.5 border-b border-slate-800/30">
+    const col=mrColor(s.wins,s.total), wPct=s.total?Math.round(s.wins/s.total*100):0;
+    const fPct=s.firstM.length?Math.round(s.firstW/s.firstM.length*100):null;
+    const sPct=s.secondM.length?Math.round(s.secondW/s.secondM.length*100):null;
+    const dayNames=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const monthRows=Object.entries(s.byMonth).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,8).map(([k,v])=>{
+        const pct=Math.round(v.w/v.p*100),c=mrColor(v.w,v.p);
+        return`<div class="flex items-center gap-2 py-1.5 border-b border-slate-800/30">
             <span class="text-xs text-slate-400 w-16 flex-shrink-0 font-mono">${k}</span>
             <span class="text-[10px] font-mono flex-shrink-0 w-14" style="color:${c}">${v.w}W–${v.p-v.w}L</span>
             <div class="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${c}"></div></div>
             <span class="text-[10px] font-black w-8 text-right flex-shrink-0" style="color:${c}">${pct}%</span>
         </div>`;
     }).join('');
-
-    const dayGrid = s.byDay.map((d,i)=>{
+    const dayGrid=s.byDay.map((d,i)=>{
         if(!d.p)return`<div class="text-center"><div class="text-[9px] text-slate-600">${dayNames[i]}</div><div class="text-[10px] text-slate-800 mt-0.5">—</div></div>`;
         const pct=Math.round(d.w/d.p*100),c=mrColor(d.w,d.p);
         return`<div class="text-center"><div class="text-[9px] text-slate-500">${dayNames[i]}</div><div class="text-xs font-black mt-0.5" style="color:${c}">${pct}%</div><div class="text-[8px] text-slate-700">${d.p}p</div></div>`;
     }).join('');
+    const oppEntries=Object.entries(s.byOpp).filter(([,d])=>d.p>=2).sort((a,b)=>(b[1].w/b[1].p)-(a[1].w/a[1].p));
+    const best3=oppEntries.slice(0,3);
+    const worst3=oppEntries.slice(-3).reverse().filter(x=>!best3.includes(x));
 
-    // Best / worst opponents
-    const oppEntries = Object.entries(s.byOpp).filter(([,d])=>d.p>=2).sort((a,b)=>(b[1].w/b[1].p)-(a[1].w/a[1].p));
-    const best3 = oppEntries.slice(0,3);
-    const worst3 = oppEntries.slice(-3).reverse().filter(x=>!best3.includes(x));
-
-    return `
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Overall card -->
+    return `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div class="text-xs font-black text-slate-500 uppercase tracking-wider">Global</div>
             <div class="flex items-center gap-4">
@@ -390,52 +502,33 @@ function renderGeneral(s) {
                     <div class="text-[9px] text-slate-600 uppercase tracking-wider">Mejor racha</div>
                 </div>
             </div>
-            <!-- Turn order -->
             <div>
                 <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">🎲 Win rate por turno</div>
                 <div class="grid grid-cols-2 gap-2">
                     <div class="bg-slate-800/30 rounded-lg p-2.5 border border-slate-800/50">
-                        <div class="flex justify-between text-[10px] mb-1.5">
-                            <span class="text-blue-400 font-black">Yendo 1ro</span>
-                            <span class="font-black" style="color:${mrColor(s.firstW,s.firstM.length)}">${fPct!==null?fPct+'%':'—'}</span>
-                        </div>
+                        <div class="flex justify-between text-[10px] mb-1.5"><span class="text-blue-400 font-black">Yendo 1ro</span><span class="font-black" style="color:${mrColor(s.firstW,s.firstM.length)}">${fPct!==null?fPct+'%':'—'}</span></div>
                         ${colorBar(s.firstW,s.firstM.length,'h-2')}
                         <div class="text-[9px] text-slate-700 mt-1">${s.firstM.length} partidas</div>
                     </div>
                     <div class="bg-slate-800/30 rounded-lg p-2.5 border border-slate-800/50">
-                        <div class="flex justify-between text-[10px] mb-1.5">
-                            <span class="text-slate-400 font-black">Yendo 2do</span>
-                            <span class="font-black" style="color:${mrColor(s.secondW,s.secondM.length)}">${sPct!==null?sPct+'%':'—'}</span>
-                        </div>
+                        <div class="flex justify-between text-[10px] mb-1.5"><span class="text-slate-400 font-black">Yendo 2do</span><span class="font-black" style="color:${mrColor(s.secondW,s.secondM.length)}">${sPct!==null?sPct+'%':'—'}</span></div>
                         ${colorBar(s.secondW,s.secondM.length,'h-2')}
                         <div class="text-[9px] text-slate-700 mt-1">${s.secondM.length} partidas</div>
                     </div>
                 </div>
             </div>
+            ${winRateChart(s.src)}
         </div>
-
-        <!-- Right column -->
         <div class="space-y-4">
-            ${best3.length||worst3.length ? `
+            ${best3.length||worst3.length?`
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                 <div class="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Matchups destacados (≥2 partidas)</div>
-                ${best3.length?`<div class="text-[9px] text-green-700 font-black uppercase tracking-wider mb-1">✅ Mejores</div>
-                ${best3.map(([o,d])=>{const c=mrColor(d.w,d.p);return`<div class="flex items-center gap-2 py-1 border-b border-slate-800/20">
-                    <span class="text-[10px] text-slate-300 flex-1 truncate">vs ${escapeHtml(o)}</span>
-                    <span class="text-[9px] font-mono" style="color:${c}">${d.w}W–${d.p-d.w}L</span>
-                    <span class="text-[9px] font-black w-8 text-right" style="color:${c}">${Math.round(d.w/d.p*100)}%</span>
-                </div>`;}).join('')}`:''}
-                ${worst3.length?`<div class="text-[9px] text-red-800 font-black uppercase tracking-wider mt-2 mb-1">❌ Peores</div>
-                ${worst3.map(([o,d])=>{const c=mrColor(d.w,d.p);return`<div class="flex items-center gap-2 py-1 border-b border-slate-800/20">
-                    <span class="text-[10px] text-slate-300 flex-1 truncate">vs ${escapeHtml(o)}</span>
-                    <span class="text-[9px] font-mono" style="color:${c}">${d.w}W–${d.p-d.w}L</span>
-                    <span class="text-[9px] font-black w-8 text-right" style="color:${c}">${Math.round(d.w/d.p*100)}%</span>
-                </div>`;}).join('')}`:''}
-            </div>` : ''}
-
+                ${best3.length?`<div class="text-[9px] text-green-700 font-black uppercase tracking-wider mb-1">✅ Mejores</div>${best3.map(([o,d])=>{const c=mrColor(d.w,d.p);return`<div class="flex items-center gap-2 py-1 border-b border-slate-800/20"><span class="text-[10px] text-slate-300 flex-1 truncate">vs ${escapeHtml(o)}</span>${difficultyBadge(d.w,d.p)}<span class="text-[9px] font-mono" style="color:${c}">${d.w}W–${d.p-d.w}L</span><span class="text-[9px] font-black w-8 text-right" style="color:${c}">${Math.round(d.w/d.p*100)}%</span></div>`;}).join('')}`:''}
+                ${worst3.length?`<div class="text-[9px] text-red-800 font-black uppercase tracking-wider mt-2 mb-1">❌ Peores</div>${worst3.map(([o,d])=>{const c=mrColor(d.w,d.p);return`<div class="flex items-center gap-2 py-1 border-b border-slate-800/20"><span class="text-[10px] text-slate-300 flex-1 truncate">vs ${escapeHtml(o)}</span>${difficultyBadge(d.w,d.p)}<span class="text-[9px] font-mono" style="color:${c}">${d.w}W–${d.p-d.w}L</span><span class="text-[9px] font-black w-8 text-right" style="color:${c}">${Math.round(d.w/d.p*100)}%</span></div>`;}).join('')}`:''}
+            </div>`:''}
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                 <div class="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Por mes</div>
-                ${monthRows || '<p class="text-slate-700 text-xs">Sin datos suficientes.</p>'}
+                ${monthRows||'<p class="text-slate-700 text-xs">Sin datos suficientes.</p>'}
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                 <div class="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Por día de semana</div>
@@ -446,37 +539,38 @@ function renderGeneral(s) {
 }
 
 function renderLideres(s) {
-    const leaders = Object.entries(s.byMyLeader).sort((a,b)=>b[1].p-a[1].p);
-    if (!leaders.length) return noDataPlaceholder('⚓','Sin datos','Registra partidas con líderes');
+    const leaders=Object.entries(s.byMyLeader).sort((a,b)=>b[1].p-a[1].p);
+    if(!leaders.length)return noDataPlaceholder('⚓','Sin datos','Registra partidas con líderes');
     return `<div class="space-y-2">${leaders.map(([ldr,d],idx)=>{
-        const isOpen=expandedLider===idx, col=mrColor(d.w,d.p), pct=Math.round(d.w/d.p*100);
+        const isOpen=expandedLider===idx,col=mrColor(d.w,d.p),pct=Math.round(d.w/d.p*100);
         const fPct=d.first?Math.round(d.firstW/d.first*100):null;
         const sPct=d.second?Math.round(d.secondW/d.second*100):null;
         let det='';
-        if (isOpen) {
-            const oppRows = Object.entries(d.vsOpps).sort((a,b)=>b[1].p-a[1].p).map(([opp,od])=>{
-                const oc=mrColor(od.w,od.p), ofP=od.first?Math.round(od.firstW/od.first*100):null, osP=od.second?Math.round(od.secondW/od.second*100):null;
+        if(isOpen){
+            const dvEntries=Object.entries(d.decks||{});
+            const dvHtml=dvEntries.length?`<div class="px-4 py-2.5 border-b border-slate-800/30">
+                <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">📋 Por variante</div>
+                ${dvEntries.sort((a,b)=>b[1].p-a[1].p).map(([dv,dv_d])=>{const dc=mrColor(dv_d.w,dv_d.p);return`<div class="flex items-center gap-2 py-1 border-b border-slate-800/20"><span class="text-[10px] text-slate-400 flex-1">${escapeHtml(dv)}</span><span class="text-[9px] font-mono" style="color:${dc}">${dv_d.w}W–${dv_d.p-dv_d.w}L</span><span class="text-[9px] font-black w-7 text-right" style="color:${dc}">${Math.round(dv_d.w/dv_d.p*100)}%</span></div>`;}).join('')}
+            </div>`:'';
+            const oppRows=Object.entries(d.vsOpps).sort((a,b)=>b[1].p-a[1].p).map(([opp,od])=>{
+                const oc=mrColor(od.w,od.p),ofP=od.first?Math.round(od.firstW/od.first*100):null,osP=od.second?Math.round(od.secondW/od.second*100):null;
                 return`<div class="flex items-center gap-2 py-1.5 border-b border-slate-800/20">
-                    <div class="flex-1 min-w-0">
-                        <div class="text-[10px] text-slate-300 truncate">${escapeHtml(opp)}</div>
-                        <div class="flex gap-2 mt-0.5">${ofP!==null?`<span class="text-[9px] text-blue-400">1ro:${ofP}%</span>`:''}${osP!==null?`<span class="text-[9px] text-slate-600">2do:${osP}%</span>`:''}</div>
-                    </div>
+                    <div class="flex-1 min-w-0"><div class="text-[10px] text-slate-300 truncate">${escapeHtml(opp)}</div><div class="flex gap-2 mt-0.5">${ofP!==null?`<span class="text-[9px] text-blue-400">1ro:${ofP}%</span>`:''} ${osP!==null?`<span class="text-[9px] text-slate-600">2do:${osP}%</span>`:''}</div></div>
+                    ${difficultyBadge(od.w,od.p)}
                     <span class="text-[9px] font-mono flex-shrink-0" style="color:${oc}">${od.w}W–${od.p-od.w}L</span>
-                    <div class="w-14 flex-shrink-0">${colorBar(od.w,od.p,'h-1.5')}</div>
+                    <div class="w-12 flex-shrink-0">${colorBar(od.w,od.p,'h-1.5')}</div>
                     <span class="text-[9px] font-black w-7 text-right flex-shrink-0" style="color:${oc}">${Math.round(od.w/od.p*100)}%</span>
                 </div>`;
             }).join('');
-            det=`<div class="px-4 py-3 bg-slate-900/40 border-b border-slate-800/30">
+            det=`${dvHtml}
+            <div class="px-4 py-3 bg-slate-900/40 border-b border-slate-800/30">
                 <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">🎲 Win rate por turno</div>
                 <div class="grid grid-cols-2 gap-3">
                     <div><div class="flex justify-between text-[9px] mb-1"><span class="text-slate-500">Yendo 1ro</span><span style="color:${mrColor(d.firstW,d.first)}">${fPct!==null?fPct+'%':'—'} (${d.first}p)</span></div>${colorBar(d.firstW,d.first,'h-2')}</div>
                     <div><div class="flex justify-between text-[9px] mb-1"><span class="text-slate-500">Yendo 2do</span><span style="color:${mrColor(d.secondW,d.second)}">${sPct!==null?sPct+'%':'—'} (${d.second}p)</span></div>${colorBar(d.secondW,d.second,'h-2')}</div>
                 </div>
             </div>
-            <div class="px-4 py-2.5">
-                <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">⚔️ Vs cada oponente</div>
-                ${oppRows||'<p class="text-slate-700 text-xs">Sin enfrentamientos.</p>'}
-            </div>`;
+            <div class="px-4 py-2.5"><div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">⚔️ Vs cada oponente</div>${oppRows||'<p class="text-slate-700 text-xs">Sin enfrentamientos.</p>'}</div>`;
         }
         return`<div class="bg-slate-800/20 border border-slate-800/40 rounded-xl overflow-hidden">
             <button onclick="expandLider(${idx})" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/40 transition text-left">
@@ -485,22 +579,21 @@ function renderLideres(s) {
                 <span class="text-[10px] font-mono flex-shrink-0" style="color:${col}">${d.w}W–${d.p-d.w}L</span>
                 <span class="text-[10px] font-black w-9 text-right flex-shrink-0" style="color:${col}">${pct}%</span>
                 <span class="text-[10px] text-slate-600 ml-1 flex-shrink-0">${isOpen?'▲':'▼'}</span>
-            </button>
-            ${det}
+            </button>${det}
         </div>`;
     }).join('')}</div>`;
 }
 
 function renderOponentes(s) {
-    const opps = Object.entries(s.byOpp).sort((a,b)=>b[1].p-a[1].p);
-    if (!opps.length) return noDataPlaceholder('🎯','Sin datos','Registra partidas para ver oponentes');
+    const opps=Object.entries(s.byOpp).sort((a,b)=>b[1].p-a[1].p);
+    if(!opps.length)return noDataPlaceholder('🎯','Sin datos','Registra partidas para ver oponentes');
     return `<div class="space-y-2">${opps.map(([opp,d],idx)=>{
-        const isOpen=expandedOpp===idx, col=mrColor(d.w,d.p), pct=Math.round(d.w/d.p*100);
+        const isOpen=expandedOpp===idx,col=mrColor(d.w,d.p),pct=Math.round(d.w/d.p*100);
         const fPct=d.first?Math.round(d.firstW/d.first*100):null;
         const sPct=d.second?Math.round(d.secondW/d.second*100):null;
         let det='';
-        if (isOpen) {
-            const oppMatches = matches.filter(m=>m.oppLeader===opp).slice(-5).reverse();
+        if(isOpen){
+            const oppMatches=matches.filter(m=>m.oppLeader===opp).slice(-5).reverse();
             det=`<div class="px-4 py-3 bg-slate-900/40 border-b border-slate-800/30">
                 <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">🎲 Por turno</div>
                 <div class="grid grid-cols-2 gap-3">
@@ -508,47 +601,43 @@ function renderOponentes(s) {
                     <div><div class="flex justify-between text-[9px] mb-1"><span class="text-slate-500">Yendo 2do</span><span style="color:${mrColor(d.secondW,d.second)}">${sPct!==null?sPct+'%':'—'} (${d.second}p)</span></div>${colorBar(d.secondW,d.second,'h-2')}</div>
                 </div>
             </div>
-            <div class="px-4 py-2.5">
-                <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">Últimos enfrentamientos</div>
-                ${oppMatches.map(m=>`<div class="flex items-center gap-2 py-1 border-b border-slate-800/20">
-                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${m.result==='win'?'bg-green-500':'bg-red-500'}"></span>
-                    <span class="text-[10px] text-yellow-500 flex-1 truncate">${escapeHtml(m.myLeader)}</span>
-                    <span class="text-[9px] ${m.turnOrder==='first'?'text-blue-400':'text-slate-600'}">${m.turnOrder==='first'?'1ro':'2do'}</span>
-                    <span class="text-[10px] font-black ${m.result==='win'?'text-green-400':'text-red-400'}">${m.result==='win'?'W':'L'}</span>
-                    <span class="text-[9px] text-slate-700 font-mono">${m.date.slice(0,10)}</span>
-                </div>`).join('')}
-            </div>`;
+            <div class="px-4 py-2.5"><div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">Últimos enfrentamientos</div>
+            ${oppMatches.map(m=>`<div class="flex items-center gap-2 py-1 border-b border-slate-800/20">
+                <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${m.result==='win'?'bg-green-500':'bg-red-500'}"></span>
+                <span class="text-[10px] text-yellow-500 flex-1 truncate">${escapeHtml(m.myLeader)}</span>
+                <span class="text-[9px] ${m.turnOrder==='first'?'text-blue-400':'text-slate-600'}">${m.turnOrder==='first'?'1ro':'2do'}</span>
+                <span class="text-[10px] font-black ${m.result==='win'?'text-green-400':'text-red-400'}">${m.result==='win'?'W':'L'}</span>
+                <span class="text-[9px] text-slate-700 font-mono">${m.date.slice(0,10)}</span>
+            </div>`).join('')}</div>`;
         }
         return`<div class="bg-slate-800/20 border border-slate-800/40 rounded-xl overflow-hidden">
             <button onclick="expandOpp(${idx})" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800/40 transition text-left">
                 ${donutSvg(d.w,d.p,col,32,12,7.5)}
                 <div class="flex-1 min-w-0"><div class="font-black text-slate-200 text-sm truncate">vs ${escapeHtml(opp)}</div><div class="text-[10px] text-slate-600">${d.p} enfrentamientos</div></div>
+                ${difficultyBadge(d.w,d.p)}
                 <span class="text-[10px] font-mono flex-shrink-0" style="color:${col}">${d.w}W–${d.p-d.w}L</span>
                 <span class="text-[10px] font-black w-9 text-right flex-shrink-0" style="color:${col}">${pct}%</span>
                 <span class="text-[10px] text-slate-600 ml-1 flex-shrink-0">${isOpen?'▲':'▼'}</span>
-            </button>
-            ${det}
+            </button>${det}
         </div>`;
     }).join('')}</div>`;
 }
 
 function renderMatchups(s) {
-    const leaders = Object.keys(s.byMyLeader).sort();
-    if (!leaders.length) return noDataPlaceholder('⚔️','Sin datos','Registra partidas para ver matchups');
-    const selIdx = (expandedLider !== null && leaders[expandedLider]) ? expandedLider : 0;
-    const selLdr = leaders[selIdx];
-    const d = s.byMyLeader[selLdr];
-
-    const ldrBtns = leaders.map((l,i)=>{
-        const ld=s.byMyLeader[l], col=mrColor(ld.w,ld.p), pct=Math.round(ld.w/ld.p*100), active=l===selLdr;
+    const leaders=Object.keys(s.byMyLeader).sort();
+    if(!leaders.length)return noDataPlaceholder('⚔️','Sin datos','Registra partidas para ver matchups');
+    const selIdx=(expandedLider!==null&&leaders[expandedLider])?expandedLider:0;
+    const selLdr=leaders[selIdx];
+    const d=s.byMyLeader[selLdr];
+    const ldrBtns=leaders.map((l,i)=>{
+        const ld=s.byMyLeader[l],col=mrColor(ld.w,ld.p),pct=Math.round(ld.w/ld.p*100),active=l===selLdr;
         return`<button onclick="selectMatchupLider(${i})" class="px-3 py-2 rounded-xl border text-xs font-black transition flex-shrink-0 ${active?'bg-yellow-900/30 border-yellow-700/40 text-yellow-400':'bg-slate-800/50 border-slate-700/40 text-slate-500 hover:border-slate-600'}">
             <div class="truncate max-w-[110px]">${escapeHtml(l)}</div>
             <div class="text-[9px] mt-0.5" style="color:${col}">${pct}%</div>
         </button>`;
     }).join('');
-
-    const oppRows = d ? Object.entries(d.vsOpps).sort((a,b)=>b[1].p-a[1].p).map(([opp,od])=>{
-        const oc=mrColor(od.w,od.p), pct=Math.round(od.w/od.p*100);
+    const oppRows=d?Object.entries(d.vsOpps).sort((a,b)=>b[1].p-a[1].p).map(([opp,od])=>{
+        const oc=mrColor(od.w,od.p),pct=Math.round(od.w/od.p*100);
         const fPct=od.first?Math.round(od.firstW/od.first*100):null;
         const sPct=od.second?Math.round(od.secondW/od.second*100):null;
         return`<div class="flex items-center gap-2 px-4 py-2.5 border-b border-slate-800/30">
@@ -556,13 +645,13 @@ function renderMatchups(s) {
                 <div class="text-sm text-slate-200 font-bold truncate">${escapeHtml(opp)}</div>
                 <div class="flex gap-2 mt-0.5">${fPct!==null?`<span class="text-[9px] text-blue-400">1ro: ${fPct}%</span>`:''}${sPct!==null?`<span class="text-[9px] text-slate-600">2do: ${sPct}%</span>`:''}</div>
             </div>
+            ${difficultyBadge(od.w,od.p)}
             <span class="text-[10px] font-mono flex-shrink-0" style="color:${oc}">${od.w}W–${od.p-od.w}L</span>
-            <div class="w-20 flex-shrink-0">${colorBar(od.w,od.p,'h-2')}</div>
+            <div class="w-16 flex-shrink-0">${colorBar(od.w,od.p,'h-2')}</div>
             <span class="text-[10px] font-black w-8 text-right flex-shrink-0" style="color:${oc}">${pct}%</span>
         </div>`;
-    }).join('') : '';
-
-    const dc = d ? mrColor(d.w,d.p) : '#475569';
+    }).join(''):'';
+    const dc=d?mrColor(d.w,d.p):'#475569';
     return`<div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div class="p-4 border-b border-slate-800">
             <div class="text-[10px] text-slate-600 font-black uppercase tracking-wider mb-3">Tu líder</div>
@@ -578,14 +667,12 @@ function renderMatchups(s) {
 
 // ── HISTORY VIEW ──────────────────────────────────────────────────────────────
 function renderHistory() {
-    if (!matches.length) return noDataPlaceholder('📋','Sin partidas registradas','Registra tu primera partida');
-    const allL = [...new Set(matches.flatMap(m=>[m.myLeader,m.oppLeader]).filter(Boolean))].sort();
-    const lOpts = allL.map(l=>`<option value="${escapeHtml(l)}" ${histFilterLeader===l||histFilterOpp===l?'':''}>${escapeHtml(l)}</option>`).join('');
-    let filtered = [...matches].reverse();
-    if (histFilterLeader) filtered = filtered.filter(m=>m.myLeader===histFilterLeader);
-    if (histFilterOpp)    filtered = filtered.filter(m=>m.oppLeader===histFilterOpp);
-    if (histFilterResult) filtered = filtered.filter(m=>m.result===histFilterResult);
-
+    if(!matches.length)return noDataPlaceholder('📋','Sin partidas registradas','Registra tu primera partida');
+    const allL=[...new Set(matches.flatMap(m=>[m.myLeader,m.oppLeader]).filter(Boolean))].sort();
+    let filtered=[...matches].reverse();
+    if(histFilterLeader)filtered=filtered.filter(m=>m.myLeader===histFilterLeader);
+    if(histFilterOpp)filtered=filtered.filter(m=>m.oppLeader===histFilterOpp);
+    if(histFilterResult)filtered=filtered.filter(m=>m.result===histFilterResult);
     return`<div class="space-y-3">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -608,88 +695,227 @@ function renderHistory() {
                 </div>
             </div>
         </div>
-
         <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-            ${filtered.length ? filtered.map(m=>`
-            <div class="flex items-start gap-3 px-4 py-3 border-b border-slate-800/40 hover:bg-slate-800/20 transition">
-                <div class="flex flex-col items-center gap-1 flex-shrink-0 pt-1">
-                    <span class="w-2.5 h-2.5 rounded-full ${m.result==='win'?'bg-green-500':'bg-red-500'}"></span>
-                    <span class="text-[8px] font-black ${m.turnOrder==='first'?'text-blue-400':'text-slate-600'}">${m.turnOrder==='first'?'1ro':'2do'}</span>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-sm font-black text-yellow-400">${escapeHtml(m.myLeader||'?')}</span>
-                        <span class="text-[10px] text-slate-600">vs</span>
-                        <span class="text-sm font-bold text-slate-300">${escapeHtml(m.oppLeader||'?')}</span>
+            ${filtered.length?filtered.map(m=>{
+                const tagBadges=(m.tags||[]).map(t=>{const td=TAG_DEFS.find(x=>x.id===t);return td?`<span class="text-[8px] bg-indigo-900/30 text-indigo-400 border border-indigo-700/30 px-1.5 py-0.5 rounded-md">${td.label}</span>`:''}).join('');
+                return`<div class="flex items-start gap-3 px-4 py-3 border-b border-slate-800/40 hover:bg-slate-800/20 transition">
+                    <div class="flex flex-col items-center gap-1 flex-shrink-0 pt-1">
+                        <span class="w-2.5 h-2.5 rounded-full ${m.result==='win'?'bg-green-500':'bg-red-500'}"></span>
+                        <span class="text-[8px] font-black ${m.turnOrder==='first'?'text-blue-400':'text-slate-600'}">${m.turnOrder==='first'?'1ro':'2do'}</span>
                     </div>
-                    ${m.notes?`<p class="text-[10px] text-slate-600 mt-0.5 italic">${escapeHtml(m.notes)}</p>`:''}
-                    <div class="text-[9px] text-slate-700 mt-0.5 font-mono">${new Date(m.date).toLocaleString('es',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
-                </div>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                    <span class="text-xs font-black px-2 py-0.5 rounded ${m.result==='win'?'bg-green-900/40 text-green-400':'bg-red-900/40 text-red-400'}">${m.result==='win'?'W':'L'}</span>
-                    <button onclick="deleteMatch(${m.id})" class="text-slate-700 hover:text-red-500 transition text-xs" title="Eliminar">✕</button>
-                </div>
-            </div>`).join('') : '<p class="text-slate-600 text-sm text-center py-8">No hay partidas con ese filtro.</p>'}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-sm font-black text-yellow-400">${escapeHtml(m.myLeader||'?')}</span>
+                            ${m.deckVariant?`<span class="text-[9px] text-slate-600 italic">${escapeHtml(m.deckVariant)}</span>`:''}
+                            <span class="text-[10px] text-slate-600">vs</span>
+                            <span class="text-sm font-bold text-slate-300">${escapeHtml(m.oppLeader||'?')}</span>
+                        </div>
+                        ${tagBadges?`<div class="flex flex-wrap gap-1 mt-1">${tagBadges}</div>`:''}
+                        ${m.notes?`<p class="text-[10px] text-slate-600 mt-0.5 italic">${escapeHtml(m.notes)}</p>`:''}
+                        <div class="text-[9px] text-slate-700 mt-0.5 font-mono">${new Date(m.date).toLocaleString('es',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <span class="text-xs font-black px-2 py-0.5 rounded ${m.result==='win'?'bg-green-900/40 text-green-400':'bg-red-900/40 text-red-400'}">${m.result==='win'?'W':'L'}</span>
+                        <button onclick="startEdit(${m.id})" class="text-slate-700 hover:text-yellow-500 transition text-xs" title="Editar">✏️</button>
+                        <button onclick="deleteMatch(${m.id})" class="text-slate-700 hover:text-red-500 transition text-xs" title="Eliminar">✕</button>
+                    </div>
+                </div>`;
+            }).join(''):'<p class="text-slate-600 text-sm text-center py-8">No hay partidas con ese filtro.</p>'}
         </div>
-
-        <div class="flex justify-between items-center">
-            <div class="flex gap-2">
-                <button onclick="exportData()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-black uppercase transition border border-slate-700/50">💾 Exportar JSON</button>
-                <label class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-black uppercase transition border border-slate-700/50 cursor-pointer">
-                    📂 Importar JSON
-                    <input type="file" class="hidden" accept=".json" onchange="importData(event)">
-                </label>
-            </div>
+        <div class="flex justify-end">
             <button onclick="clearAll()" class="px-4 py-2 bg-slate-800 hover:bg-red-900/40 text-slate-600 hover:text-red-400 rounded-xl text-xs font-black uppercase transition border border-slate-700/50">🗑️ Borrar todo</button>
         </div>
     </div>`;
 }
 
+// ── TORNEO RÁPIDO VIEW ────────────────────────────────────────────────────────
+function renderTorneo() {
+    const leaders=getKnownLeaders();
+    const opts=leaders.map(l=>`<option value="${escapeHtml(l)}">`).join('');
+    const qW=quickMatches.filter(m=>m.result==='win').length;
+    return `
+    <datalist id="qtOpts">${opts}</datalist>
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div>
+                <h2 class="text-sm font-black text-yellow-500 uppercase tracking-wider">🏆 Torneo Rápido</h2>
+                <p class="text-xs text-slate-600 mt-1">Acumula partidas de un torneo y guárdalas de una vez.</p>
+            </div>
+            <div>
+                <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-1">Nombre del torneo (opcional)</label>
+                <input id="qtName" placeholder="Ej: FNM Marzo, Regional Lima..."
+                    class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm">
+            </div>
+            <div>
+                <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-1">Tu Líder</label>
+                <input id="qtMyLeader" list="qtOpts" placeholder="Ej: Luffy OP-09"
+                    class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm">
+            </div>
+            <div>
+                <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-1">Líder Oponente</label>
+                <input id="qtOppLeader" list="qtOpts" placeholder="Ej: Enel OP-03"
+                    class="w-full bg-slate-800 p-2.5 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-sm">
+            </div>
+            <div>
+                <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-2">Turno</label>
+                <div class="flex gap-2">
+                    <button id="qtBtn1ro" onclick="qtSelectTurn('first')"  class="flex-1 py-2 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">1ro 🟦</button>
+                    <button id="qtBtn2do" onclick="qtSelectTurn('second')" class="flex-1 py-2 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">2do ⬜</button>
+                </div>
+            </div>
+            <div>
+                <label class="text-[10px] text-slate-600 uppercase tracking-widest font-black block mb-2">Resultado</label>
+                <div class="flex gap-2">
+                    <button id="qtBtnWin"  onclick="qtSelectResult('win')"  class="flex-1 py-2 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">🏆 W</button>
+                    <button id="qtBtnLoss" onclick="qtSelectResult('loss')" class="flex-1 py-2 rounded-xl border text-sm font-black transition bg-slate-800 text-slate-500 border-slate-700">💀 L</button>
+                </div>
+            </div>
+            <button onclick="addQuickMatch()" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-black rounded-xl uppercase transition text-sm">+ Agregar partida</button>
+            ${quickMatches.length?`<button onclick="saveQuickSession()" class="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black rounded-xl uppercase transition text-sm">💾 Guardar ${quickMatches.length} partida${quickMatches.length!==1?'s':''}</button>`:''}
+        </div>
+        <div class="lg:col-span-3">
+            ${quickMatches.length?`
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <span class="text-xs font-black text-slate-500 uppercase">En cola (${quickMatches.length})</span>
+                    <div class="flex gap-3 text-xs font-black">
+                        <span class="text-green-400">${qW}W</span>
+                        <span class="text-red-400">${quickMatches.length-qW}L</span>
+                        ${quickMatches.length?`<span style="color:${mrColor(qW,quickMatches.length)}">${Math.round(qW/quickMatches.length*100)}%</span>`:''}
+                    </div>
+                </div>
+                ${quickMatches.map((m,i)=>`
+                <div class="flex items-center gap-3 px-4 py-2.5 border-b border-slate-800/40">
+                    <span class="text-[10px] text-slate-600 font-mono w-4 flex-shrink-0">${i+1}</span>
+                    <span class="w-2 h-2 rounded-full flex-shrink-0 ${m.result==='win'?'bg-green-500':'bg-red-500'}"></span>
+                    <span class="text-xs font-bold text-yellow-400 flex-1 truncate">${escapeHtml(m.myLeader)}</span>
+                    <span class="text-[10px] text-slate-600">vs</span>
+                    <span class="text-xs text-slate-300 flex-1 truncate">${escapeHtml(m.oppLeader)}</span>
+                    <span class="text-[9px] ${m.turnOrder==='first'?'text-blue-400':'text-slate-600'}">${m.turnOrder==='first'?'1ro':'2do'}</span>
+                    <span class="text-xs font-black ${m.result==='win'?'text-green-400':'text-red-400'}">${m.result==='win'?'W':'L'}</span>
+                    <button onclick="removeQuickMatch(${i})" class="text-slate-700 hover:text-red-500 text-xs">✕</button>
+                </div>`).join('')}
+            </div>`:`
+            <div class="bg-slate-900 border-2 border-dashed border-slate-800 rounded-2xl p-12 text-center">
+                <p class="text-3xl mb-3">🏆</p>
+                <p class="text-sm font-bold text-slate-600 uppercase tracking-widest">Sin partidas en cola</p>
+                <p class="text-xs text-slate-700 mt-1">Agrega partidas y guárdalas de una vez</p>
+            </div>`}
+        </div>
+    </div>`;
+}
+function qtSelectTurn(t) {
+    qtTurn=t;
+    document.getElementById('qtBtn1ro').className=`flex-1 py-2 rounded-xl border text-sm font-black transition ${t==='first'?'sel-blue':'bg-slate-800 text-slate-500 border-slate-700'}`;
+    document.getElementById('qtBtn2do').className=`flex-1 py-2 rounded-xl border text-sm font-black transition ${t==='second'?'sel-blue':'bg-slate-800 text-slate-500 border-slate-700'}`;
+}
+function qtSelectResult(r) {
+    qtResult=r;
+    document.getElementById('qtBtnWin').className =`flex-1 py-2 rounded-xl border text-sm font-black transition ${r==='win' ?'sel-green':'bg-slate-800 text-slate-500 border-slate-700'}`;
+    document.getElementById('qtBtnLoss').className=`flex-1 py-2 rounded-xl border text-sm font-black transition ${r==='loss'?'sel-red'  :'bg-slate-800 text-slate-500 border-slate-700'}`;
+}
+function addQuickMatch() {
+    const myLeader =document.getElementById('qtMyLeader').value.trim();
+    const oppLeader=document.getElementById('qtOppLeader').value.trim();
+    if(!myLeader) {showToast('Ingresa tu líder.','warning');return;}
+    if(!oppLeader){showToast('Ingresa el líder oponente.','warning');return;}
+    if(!qtTurn)   {showToast('Selecciona turno.','warning');return;}
+    if(!qtResult) {showToast('Selecciona resultado.','warning');return;}
+    quickMatches.push({myLeader,oppLeader,turnOrder:qtTurn,result:qtResult});
+    const savedLeader=myLeader;
+    qtTurn=null; qtResult=null;
+    showToast(`Partida ${quickMatches.length} agregada.`,'info');
+    render();
+    document.getElementById('qtMyLeader').value=savedLeader;
+    document.getElementById('qtName').value=document.getElementById('qtName')?.value||'';
+}
+function removeQuickMatch(idx) { quickMatches.splice(idx,1); render(); }
+function saveQuickSession() {
+    if(!quickMatches.length)return;
+    const name=document.getElementById('qtName')?.value.trim()||'';
+    const now=Date.now();
+    quickMatches.forEach((m,i)=>{
+        matches.push({id:now+i, date:new Date().toISOString(), myLeader:m.myLeader, deckVariant:'', oppLeader:m.oppLeader, turnOrder:m.turnOrder, result:m.result, notes:name?`Torneo: ${name}`:'', tags:['tournament']});
+    });
+    saveData(); updateHeader();
+    showToast(`${quickMatches.length} partidas guardadas.`,'success');
+    quickMatches=[]; qtTurn=null; qtResult=null;
+    render();
+}
+
+// ── GOAL MODAL ────────────────────────────────────────────────────────────────
+function openGoalModal() {
+    goalPeriodSel=goal?goal.period:'week';
+    document.getElementById('goalTarget').value=goal?goal.target:'';
+    ['week','month','all'].forEach(p=>{
+        document.getElementById('gp-'+p).className=`py-2 rounded-xl border text-xs font-black transition ${p===goalPeriodSel?'sel-blue':'bg-slate-800 text-slate-500 border-slate-700'}`;
+    });
+    document.getElementById('goalClearBtn').classList.toggle('hidden',!goal);
+    document.getElementById('goalModal').classList.remove('hidden');
+}
+function closeGoalModal() { document.getElementById('goalModal').classList.add('hidden'); }
+function selectGoalPeriod(p) {
+    goalPeriodSel=p;
+    ['week','month','all'].forEach(id=>{
+        document.getElementById('gp-'+id).className=`py-2 rounded-xl border text-xs font-black transition ${id===p?'sel-blue':'bg-slate-800 text-slate-500 border-slate-700'}`;
+    });
+}
+function saveGoal() {
+    const t=parseInt(document.getElementById('goalTarget').value);
+    if(!t||t<1||t>100){showToast('Ingresa un porcentaje válido (1-100).','warning');return;}
+    goal={target:t,period:goalPeriodSel};
+    localStorage.setItem('opTcgGoal',JSON.stringify(goal));
+    closeGoalModal(); updateHeader();
+    const labels={week:'esta semana',month:'este mes',all:'total'};
+    showToast(`Meta: ${t}%W (${labels[goalPeriodSel]}).`,'success');
+}
+function clearGoal() {
+    goal=null; localStorage.removeItem('opTcgGoal');
+    closeGoalModal(); updateHeader();
+    showToast('Meta eliminada.','info');
+}
+
 // ── EXPAND / MATCHUP TOGGLES ──────────────────────────────────────────────────
-function expandLider(idx)       { expandedLider = expandedLider===idx?null:idx; render(); }
-function expandOpp(idx)         { expandedOpp   = expandedOpp===idx?null:idx;   render(); }
-function selectMatchupLider(i)  { expandedLider = i; statsTab='matchups'; render(); }
+function expandLider(idx)      { expandedLider=expandedLider===idx?null:idx; render(); }
+function expandOpp(idx)        { expandedOpp=expandedOpp===idx?null:idx; render(); }
+function selectMatchupLider(i) { expandedLider=i; statsTab='matchups'; render(); }
 
 // ── IMPORT / EXPORT ───────────────────────────────────────────────────────────
 function exportData() {
-    const blob = new Blob([JSON.stringify(matches, null, 2)], {type:'application/json'});
-    const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+    const blob=new Blob([JSON.stringify(matches,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     a.download=`training_log_${new Date().toISOString().slice(0,10)}.json`; a.click();
     URL.revokeObjectURL(a.href);
-    showToast('Archivo exportado.', 'success');
+    showToast('Archivo exportado.','success');
 }
 function importData(event) {
-    const file = event.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async e => {
+    const file=event.target.files[0]; if(!file)return;
+    const reader=new FileReader();
+    reader.onload=async e=>{
         try {
-            const data = JSON.parse(e.target.result);
-            if (!Array.isArray(data)) throw new Error();
-            const ok = await showConfirm(`¿Importar ${data.length} partidas?\nSe agregarán a las existentes.`, 'Importar');
-            if (!ok) return;
-            const existingIds = new Set(matches.map(m => m.id));
-            data.forEach(m => { if (!existingIds.has(m.id)) matches.push(m); });
+            const data=JSON.parse(e.target.result);
+            if(!Array.isArray(data))throw new Error();
+            const ok=await showConfirm(`¿Importar ${data.length} partidas?\nSe agregarán a las existentes.`,'Importar');
+            if(!ok)return;
+            const existingIds=new Set(matches.map(m=>m.id));
+            data.forEach(m=>{if(!existingIds.has(m.id))matches.push(m);});
             saveData(); updateHeader(); render();
-            showToast(`${data.length} partidas importadas.`, 'success');
-        } catch { showToast('Archivo inválido.', 'error'); }
+            showToast(`${data.length} partidas importadas.`,'success');
+        } catch { showToast('Archivo inválido.','error'); }
     };
     reader.readAsText(file);
-    event.target.value = '';
+    event.target.value='';
 }
 async function clearAll() {
-    const ok = await showConfirm(`¿Borrar las ${matches.length} partidas?\nEsta acción no se puede deshacer.`, 'Borrar todo', true);
-    if (!ok) return;
+    const ok=await showConfirm(`¿Borrar las ${matches.length} partidas?\nEsta acción no se puede deshacer.`,'Borrar todo',true);
+    if(!ok)return;
     matches=[]; saveData(); updateHeader(); render();
-    showToast('Historial borrado.', 'info');
+    showToast('Historial borrado.','info');
 }
 
 // ── SHARED HELPERS ────────────────────────────────────────────────────────────
-function noDataPlaceholder(icon, title, sub) {
-    return `<div class="text-center py-16 text-slate-700 border-2 border-dashed border-slate-800/60 rounded-2xl">
-        <p class="text-4xl mb-3">${icon}</p>
-        <p class="text-sm font-bold uppercase tracking-widest">${title}</p>
-        <p class="text-xs mt-1 text-slate-800">${sub}</p>
-    </div>`;
+function noDataPlaceholder(icon,title,sub) {
+    return`<div class="text-center py-16 text-slate-700 border-2 border-dashed border-slate-800/60 rounded-2xl"><p class="text-4xl mb-3">${icon}</p><p class="text-sm font-bold uppercase tracking-widest">${title}</p><p class="text-xs mt-1 text-slate-800">${sub}</p></div>`;
 }
 function mrColor(w,t) { if(!t)return'#475569'; const r=w/t; return r>0.5?'#4ade80':r===0.5?'#facc15':'#f87171'; }
 function colorBar(w,t,h='h-1.5') {
@@ -699,18 +925,48 @@ function colorBar(w,t,h='h-1.5') {
 }
 function donutSvg(wins,total,color,size=32,r=12,fs=7.5) {
     if(!total)return`<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#1e293b" stroke-width="3.5"/></svg>`;
-    const circ=2*Math.PI*r, dash=(wins/total)*circ;
+    const circ=2*Math.PI*r,dash=(wins/total)*circ;
     return`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
         <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#1e293b" stroke-width="3.5"/>
         <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="3.5"
-            stroke-dasharray="${dash.toFixed(1)} ${(circ).toFixed(1)}" stroke-linecap="round" transform="rotate(-90 ${size/2} ${size/2})"/>
+            stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 ${size/2} ${size/2})"/>
         <text x="${size/2}" y="${size/2+fs*0.42}" text-anchor="middle" font-size="${fs}" font-weight="900" fill="${color}">${Math.round(wins/total*100)}</text>
     </svg>`;
+}
+function winRateChart(src) {
+    if(!src||src.length<3)return'';
+    const W=380,H=80,padX=10,padY=8;
+    const pts=[];let w=0;
+    src.forEach((m,i)=>{if(m.result==='win')w++;pts.push({x:i,y:w/(i+1)*100});});
+    const n=pts.length;
+    const xS=(W-padX*2)/Math.max(n-1,1);
+    const yS=(H-padY*2)/100;
+    const poly=pts.map(p=>`${padX+p.x*xS},${H-padY-p.y*yS}`).join(' ');
+    const lastCol=mrColor(w,n);
+    const ref50y=H-padY-50*yS;
+    return`<div class="mt-3 pt-3 border-t border-slate-800/40">
+        <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-2">📈 Evolución win rate</div>
+        <div class="bg-slate-800/20 rounded-xl overflow-hidden p-1">
+            <svg width="100%" viewBox="0 0 ${W} ${H}" class="w-full" style="height:80px">
+                <line x1="${padX}" y1="${ref50y}" x2="${W-padX}" y2="${ref50y}" stroke="#334155" stroke-width="0.8" stroke-dasharray="3,3"/>
+                <text x="${W-padX-1}" y="${ref50y-2}" fill="#475569" font-size="6" text-anchor="end">50%</text>
+                <polyline points="${poly}" fill="none" stroke="${lastCol}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
+                <circle cx="${padX+(n-1)*xS}" cy="${H-padY-pts[n-1].y*yS}" r="2.5" fill="${lastCol}"/>
+            </svg>
+        </div>
+    </div>`;
+}
+function difficultyBadge(w,p) {
+    if(p<3)return'';
+    const pct=w/p*100;
+    if(pct>=65)return'<span class="text-[8px] bg-green-900/40 text-green-400 border border-green-700/30 px-1.5 py-0.5 rounded-md font-black flex-shrink-0">Favorable</span>';
+    if(pct>=45)return'<span class="text-[8px] bg-yellow-900/40 text-yellow-400 border border-yellow-700/30 px-1.5 py-0.5 rounded-md font-black flex-shrink-0">Parejo</span>';
+    return'<span class="text-[8px] bg-red-900/40 text-red-400 border border-red-700/30 px-1.5 py-0.5 rounded-md font-black flex-shrink-0">Difícil</span>';
 }
 function escapeHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-function showToast(msg, type='info', duration=3500) {
+function showToast(msg,type='info',duration=3500) {
     const C={success:'bg-green-950 border-green-700/60 text-green-200',error:'bg-red-950 border-red-700/60 text-red-200',warning:'bg-yellow-950 border-yellow-700/60 text-yellow-200',info:'bg-slate-800 border-slate-600/60 text-slate-200'};
     const I={success:'✓',error:'✕',warning:'⚠',info:'ℹ'};
     const el=document.createElement('div');
@@ -719,11 +975,11 @@ function showToast(msg, type='info', duration=3500) {
     document.getElementById('toastContainer').appendChild(el);
     setTimeout(()=>{el.classList.replace('toast-in','toast-out');setTimeout(()=>el.remove(),260);},duration);
 }
-function showConfirm(msg, okText='Aceptar', danger=false) {
-    return new Promise(resolve => {
+function showConfirm(msg,okText='Aceptar',danger=false) {
+    return new Promise(resolve=>{
         const modal=document.getElementById('confirmModal');
         document.getElementById('confirmMsg').textContent=msg;
-        const ok=document.getElementById('confirmOk'), cx=document.getElementById('confirmCancel');
+        const ok=document.getElementById('confirmOk'),cx=document.getElementById('confirmCancel');
         ok.textContent=okText;
         ok.className=`flex-1 py-2.5 rounded-xl font-black transition text-sm ${danger?'bg-red-700 hover:bg-red-600 text-white':'bg-yellow-600 hover:bg-yellow-500 text-slate-950'}`;
         modal.classList.remove('hidden');
