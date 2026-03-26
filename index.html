@@ -307,6 +307,9 @@ let addMode            = 'single';
 let tournamentFormat   = 'bo1'; // 'bo1' | 'bo3'
 let soundMuted         = false;
 let analyticsTab       = 'lideres';
+let matchupExpandedLeader = null;
+let _muLeaders = [];
+function toggleMatchupLeader(idx) { const l = _muLeaders[idx]; matchupExpandedLeader = matchupExpandedLeader === l ? null : l; renderAnalytics(); }
 const expandedRounds   = new Set();
 
 // ─── SOUND ALERTS (Web Audio API) ─────────────────────────────────────────────
@@ -652,7 +655,7 @@ function generateNextRound() {
         let p2 = active.find((p,j) => j>i && !paired.has(p.id) && !p1.opponents.includes(p.id)) || null;
         if (!p2) p2 = active.find((p,j) => j>i && !paired.has(p.id)) || null;
         if (p2) {
-            matches.push({ id:++matchIdCounter, table: matches.length+1, p1:{id:p1.id,name:p1.name,leader:p1.leader}, p2:{id:p2.id,name:p2.name,leader:p2.leader}, winner:null, notes:'', format: tournamentFormat, games: mkMatchGames() });
+            matches.push({ id:++matchIdCounter, table: matches.length+1, p1:{id:p1.id,name:p1.name,leader:p1.leader}, p2:{id:p2.id,name:p2.name,leader:p2.leader}, winner:null, notes:'', format: tournamentFormat, games: mkMatchGames(), firstPlayer: null });
             paired.add(p1.id); paired.add(p2.id);
         } else {
             matches.push({ id:++matchIdCounter, table: matches.length+1, p1:{id:p1.id,name:p1.name,leader:p1.leader}, p2:{id:'bye',name:'BYE',leader:''}, winner:'p1', notes:'', format: tournamentFormat, games: null });
@@ -698,6 +701,12 @@ function setWinner(rIdx, matchId, winner) {
     const m = rounds[rIdx].find(m => m.id === matchId);
     m.winner = m.winner === winner ? null : winner;
     calculateStats(); renderRounds(); updateRanking(); autoSave();
+}
+function setFirstPlayer(rIdx, matchId, who) {
+    const m = rounds[rIdx]?.find(m => m.id === matchId);
+    if (!m) return;
+    m.firstPlayer = m.firstPlayer === who ? null : who;
+    renderRounds(); autoSave();
 }
 function saveNote(rIdx, matchId, value) {
     const m = rounds[rIdx].find(m => m.id === matchId);
@@ -796,6 +805,13 @@ function renderMatch(m, rIdx) {
                 oninput="saveNote(${rIdx},${m.id},this.value)"
             >${escapeHtml(m.notes||'')}</textarea>
         </div>` : '';
+    const fp1 = m.firstPlayer==='p1', fp2 = m.firstPlayer==='p2';
+    const fpHtml = !isBye ? `
+        <div class="flex items-center gap-1 mt-1.5 px-1">
+            <span class="text-[9px] text-slate-700 font-black uppercase tracking-wider mr-0.5">🎲 1ro:</span>
+            <button onclick="setFirstPlayer(${rIdx},${m.id},'p1')" class="px-2 py-0.5 rounded text-[9px] font-black transition ${fp1?'bg-blue-900/70 text-blue-300 border border-blue-700/50':'bg-slate-800/60 text-slate-600 border border-transparent hover:border-slate-700 hover:text-slate-400'}">${p1n}</button>
+            <button onclick="setFirstPlayer(${rIdx},${m.id},'p2')" class="px-2 py-0.5 rounded text-[9px] font-black transition ${fp2?'bg-blue-900/70 text-blue-300 border border-blue-700/50':'bg-slate-800/60 text-slate-600 border border-transparent hover:border-slate-700 hover:text-slate-400'}">${p2n}</button>
+        </div>` : '';
 
     if (isBo3) {
         return `
@@ -812,7 +828,7 @@ function renderMatch(m, rIdx) {
                         ${p2l}
                     </div>
                 </div>
-                ${notesHtml}
+                ${fpHtml}${notesHtml}
             </div>`;
     }
 
@@ -830,7 +846,7 @@ function renderMatch(m, rIdx) {
                     ${p2l}
                 </div>
             </div>
-            ${notesHtml}
+            ${fpHtml}${notesHtml}
         </div>`;
 }
 
@@ -1199,13 +1215,20 @@ function buildAnalyticsData() {
             // Leader stats
             if (wp.leader && lp.leader) {
                 [{ p: wp, opp: lp, win: true }, { p: lp, opp: wp, win: false }].forEach(({ p, opp, win }) => {
-                    if (!leaderStats[p.leader]) leaderStats[p.leader] = { partidas: 0, wins: 0, losses: 0, matchups: {} };
+                    if (!leaderStats[p.leader]) leaderStats[p.leader] = { partidas: 0, wins: 0, losses: 0, matchups: {}, gamesFirst: 0, winsFirst: 0, gamesSecond: 0, winsSecond: 0 };
                     leaderStats[p.leader].partidas++;
                     if (win) leaderStats[p.leader].wins++;
                     else leaderStats[p.leader].losses++;
                     if (!leaderStats[p.leader].matchups[opp.leader]) leaderStats[p.leader].matchups[opp.leader] = { w: 0, l: 0 };
                     if (win) leaderStats[p.leader].matchups[opp.leader].w++;
                     else leaderStats[p.leader].matchups[opp.leader].l++;
+                    // Turn order tracking (pos = match position of current p)
+                    if (m.firstPlayer) {
+                        const pos = win ? m.winner : (m.winner === 'p1' ? 'p2' : 'p1');
+                        const wentFirst = m.firstPlayer === pos;
+                        if (wentFirst) { leaderStats[p.leader].gamesFirst++; if (win) leaderStats[p.leader].winsFirst++; }
+                        else { leaderStats[p.leader].gamesSecond++; if (win) leaderStats[p.leader].winsSecond++; }
+                    }
                 });
 
                 // Matchup stats
@@ -1249,6 +1272,10 @@ function renderAnalytics() {
             const mups = Object.entries(s.matchups).filter(([,m])=>m.w+m.l>=1);
             const best  = mups.length ? mups.sort((a,b)=>(b[1].w/(b[1].w+b[1].l))-(a[1].w/(a[1].w+a[1].l)))[0] : null;
             const worst = mups.length ? [...mups].sort((a,b)=>(a[1].w/(a[1].w+a[1].l))-(b[1].w/(b[1].w+b[1].l)))[0] : null;
+            const hasTO = (s.gamesFirst + s.gamesSecond) > 0;
+            const wf = s.gamesFirst > 0 ? Math.round(s.winsFirst/s.gamesFirst*100) : null;
+            const ws = s.gamesSecond > 0 ? Math.round(s.winsSecond/s.gamesSecond*100) : null;
+            const toHtml = hasTO ? `<div class="text-[9px] text-slate-600 mt-0.5 font-mono">🎲 1ro: ${wf!==null?wf+'% ('+s.gamesFirst+')':'—'}  &nbsp; 2do: ${ws!==null?ws+'% ('+s.gamesSecond+')':'—'}</div>` : '';
             return `<div class="bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 border border-slate-700/30">
                 ${donutChart(s.wins, s.partidas, color)}
                 <div class="flex-1 min-w-0">
@@ -1256,6 +1283,7 @@ function renderAnalytics() {
                     <div class="text-[10px] text-slate-500 mt-0.5">${s.partidas} partidas · <span style="color:${color}">${s.wins}W–${s.losses}L</span></div>
                     ${best ? `<div class="text-[10px] text-slate-600 truncate">✅ ${escapeHtml(best[0])} (${best[1].w}-${best[1].l})</div>` : ''}
                     ${worst && worst[0] !== best?.[0] ? `<div class="text-[10px] text-slate-600 truncate">❌ ${escapeHtml(worst[0])} (${worst[1].w}-${worst[1].l})</div>` : ''}
+                    ${toHtml}
                 </div>
             </div>`;
         }).join('');
@@ -1291,22 +1319,58 @@ function renderAnalytics() {
         }).join('');
         body.innerHTML = `<div class="space-y-2">${cards}</div>`;
     } else if (analyticsTab === 'matchups') {
-        const matchups = Object.values(matchupStats).sort((a,b)=>(b.aW+b.bW)-(a.aW+a.bW));
-        if (!matchups.length) {
+        const allLeaders = Object.keys(leaderStats).sort();
+        if (!allLeaders.length) {
             body.innerHTML = '<p class="text-slate-600 text-sm text-center py-8">Sin datos de matchups disponibles.</p>';
             return;
         }
-        const rows = matchups.map(r => {
-            const total = r.aW + r.bW;
-            const pct = total > 0 ? ((r.aW/total)*100).toFixed(0) : 0;
-            return `<div class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-800/20 text-xs border-b border-slate-800/20">
-                <span class="font-mono text-yellow-400 flex-1 truncate">${escapeHtml(r.a)}</span>
-                <span class="font-black text-slate-200 mx-2 flex-shrink-0">${r.aW}W–${r.bW}L</span>
-                <span class="text-slate-500 text-[10px] mr-2 flex-shrink-0">(${pct}%)</span>
-                <span class="font-mono text-slate-400 flex-1 truncate text-right">vs ${escapeHtml(r.b)}</span>
+        // Helper: color by win rate
+        function mrColor(w, t) { if (!t) return '#475569'; const r = w/t; return r > 0.5 ? '#4ade80' : r === 0.5 ? '#facc15' : '#f87171'; }
+        function mrLabel(w, t) { return t ? `${w}W–${(t-w)}L` : 'sin datos'; }
+
+        _muLeaders = allLeaders;
+        const leaderRows = allLeaders.map((ldr, idx) => {
+            const s = leaderStats[ldr];
+            const isOpen = matchupExpandedLeader === ldr;
+            const overallColor = mrColor(s.wins, s.partidas);
+            const overallPct = s.partidas ? Math.round(s.wins/s.partidas*100) : null;
+
+            // Build opponent rows for this leader
+            let opponentRows = '';
+            if (isOpen) {
+                const opponents = allLeaders.filter(l => l !== ldr);
+                opponentRows = opponents.map(opp => {
+                    const [a, b] = [ldr, opp].sort();
+                    const key = `${a}§${b}`;
+                    const stat = matchupStats[key];
+                    let ldrW = 0, total = 0;
+                    if (stat) { total = stat.aW + stat.bW; ldrW = (a === ldr) ? stat.aW : stat.bW; }
+                    const noData = total === 0;
+                    const barW = total ? Math.round(ldrW/total*100) : 0;
+                    const col = mrColor(ldrW, total);
+                    return `<div class="flex items-center gap-2 px-4 py-1.5 bg-slate-900/50 ${noData?'opacity-30':''}">
+                        <span class="text-[10px] text-slate-400 flex-1 truncate">${escapeHtml(opp)}</span>
+                        <span class="text-[10px] font-mono flex-shrink-0" style="color:${col}">${mrLabel(ldrW, total)}</span>
+                        <div class="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden flex-shrink-0">
+                            ${!noData ? `<div class="h-full rounded-full" style="width:${barW}%;background:${col}"></div>` : ''}
+                        </div>
+                        <span class="text-[9px] w-7 text-right flex-shrink-0 font-black" style="color:${col}">${noData?'—':barW+'%'}</span>
+                    </div>`;
+                }).join('');
+                opponentRows = `<div class="divide-y divide-slate-800/30">${opponentRows}</div>`;
+            }
+
+            return `<div class="rounded-xl border border-slate-800/40 overflow-hidden mb-1.5 bg-slate-800/20">
+                <button onclick="toggleMatchupLeader(${idx})" class="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-800/50 transition text-left">
+                    <span class="font-black text-yellow-400 text-xs flex-1 truncate">${escapeHtml(ldr)}</span>
+                    <span class="text-[10px] font-mono flex-shrink-0" style="color:${overallColor}">${s.wins}W–${s.losses}L</span>
+                    <span class="text-[10px] font-black flex-shrink-0 w-8 text-right" style="color:${overallColor}">${overallPct !== null ? overallPct+'%' : '—'}</span>
+                    <span class="text-[10px] text-slate-600 flex-shrink-0 ml-1">${isOpen ? '▲' : '▼'}</span>
+                </button>
+                ${opponentRows}
             </div>`;
         }).join('');
-        body.innerHTML = `<div class="space-y-0.5">${rows}</div>`;
+        body.innerHTML = `<div class="text-[10px] text-slate-600 px-1 mb-3">${allLeaders.length} líderes · toca uno para ver sus matchups</div><div>${leaderRows}</div>`;
     }
 }
 
