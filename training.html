@@ -45,9 +45,14 @@
             <h1 class="text-2xl font-black text-yellow-500 uppercase tracking-tighter">Training Log</h1>
             <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mt-0.5">Registro de entrenamiento en solitario</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center justify-center gap-2">
             <span id="headerBadge" class="text-xs bg-slate-800 px-3 py-1.5 rounded-full text-slate-400 font-mono">0 partidas</span>
-            <a href="index.html" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">⚓ Torneos</a>
+            <button onclick="exportData()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">⬇️ Descargar</button>
+            <label class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50 cursor-pointer">
+                ⬆️ Cargar
+                <input type="file" class="hidden" accept=".json" onchange="importData(event)">
+            </label>
+            <a href="index.html" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">⚓ Torneos</a>
         </div>
     </header>
 
