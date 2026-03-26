@@ -1409,7 +1409,9 @@ async function resetTournament() {
     document.getElementById('totalRoundsDisplay').textContent='4';
     document.getElementById('registrationCard').classList.remove('opacity-40','pointer-events-none');
     document.getElementById('midTournamentAdd').classList.add('hidden');
-    document.getElementById('nextRoundBtn').classList.add('hidden');
+    const nrBtn = document.getElementById('nextRoundBtn');
+    nrBtn.style.display = '';
+    nrBtn.classList.add('hidden');
     const btn = document.getElementById('finishTournamentBtn');
     btn.classList.add('hidden'); btn.innerHTML='Terminar'; btn.disabled=false;
     btn.className='hidden px-6 py-4 bg-red-700 hover:bg-red-600 text-white rounded-2xl font-black uppercase transition text-sm';
