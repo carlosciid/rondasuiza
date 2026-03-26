@@ -307,9 +307,11 @@ let addMode            = 'single';
 let tournamentFormat   = 'bo1'; // 'bo1' | 'bo3'
 let soundMuted         = false;
 let analyticsTab       = 'lideres';
-let matchupExpandedLeader = null;
-let _muLeaders = [];
+let matchupExpandedLeader = null, liderExpandedIdx = null, jugadorExpandedIdx = null;
+let _muLeaders = [], _liderList = [], _jugadorList = [];
 function toggleMatchupLeader(idx) { const l = _muLeaders[idx]; matchupExpandedLeader = matchupExpandedLeader === l ? null : l; renderAnalytics(); }
+function toggleLiderExpand(idx)   { liderExpandedIdx   = liderExpandedIdx   === idx ? null : idx; renderAnalytics(); }
+function toggleJugadorExpand(idx) { jugadorExpandedIdx = jugadorExpandedIdx === idx ? null : idx; renderAnalytics(); }
 const expandedRounds   = new Set();
 
 // ─── SOUND ALERTS (Web Audio API) ─────────────────────────────────────────────
@@ -1164,6 +1166,7 @@ function openAnalytics() {
 function closeAnalytics() { document.getElementById('analyticsModal').classList.add('hidden'); }
 function setAnalyticsTab(tab) {
     analyticsTab = tab;
+    liderExpandedIdx = null; jugadorExpandedIdx = null; matchupExpandedLeader = null;
     ['lideres','jugadores','matchups'].forEach(t => {
         const btn = document.getElementById('aTab' + t.charAt(0).toUpperCase() + t.slice(1));
         if (btn) btn.className = `flex-1 py-1.5 rounded-lg text-xs font-black transition ${t===tab?'bg-slate-700 text-slate-200':'text-slate-500'}`;
@@ -1248,76 +1251,174 @@ function renderAnalytics() {
     const { leaderStats, playerStats, matchupStats } = buildAnalyticsData();
     const body = document.getElementById('analyticsBody');
 
+    // ── Shared helpers ──
+    function mrColor(w, t) { if (!t) return '#475569'; const r=w/t; return r>0.5?'#4ade80':r===0.5?'#facc15':'#f87171'; }
+    function mrLabel(w, t) { return t ? `${w}W–${t-w}L` : 'sin datos'; }
+    function colorBar(w, t, h='h-1.5', wide='w-full') {
+        if (!t) return `<div class="${h} ${wide} bg-slate-800 rounded-full opacity-20"></div>`;
+        const col = mrColor(w,t), pct = Math.round(w/t*100);
+        return `<div class="${h} ${wide} bg-slate-800 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${col}"></div></div>`;
+    }
+    function donutSvg(wins, total, color) {
+        if (!total) return `<svg width="32" height="32"><circle cx="16" cy="16" r="12" fill="none" stroke="#1e293b" stroke-width="3.5"/></svg>`;
+        const circ=75.4, dash=(wins/total)*circ;
+        return `<svg width="32" height="32" viewBox="0 0 32 32">
+            <circle cx="16" cy="16" r="12" fill="none" stroke="#1e293b" stroke-width="3.5"/>
+            <circle cx="16" cy="16" r="12" fill="none" stroke="${color}" stroke-width="3.5"
+                stroke-dasharray="${dash.toFixed(1)} ${circ}" stroke-linecap="round" transform="rotate(-90 16 16)"/>
+            <text x="16" y="20" text-anchor="middle" font-size="7.5" font-weight="900" fill="${color}">${Math.round(wins/total*100)}</text>
+        </svg>`;
+    }
+
     if (analyticsTab === 'lideres') {
         const leaders = Object.entries(leaderStats).sort((a,b)=>b[1].partidas-a[1].partidas);
-        if (!leaders.length) {
-            body.innerHTML = '<p class="text-slate-600 text-sm text-center py-8">Sin datos de líderes disponibles.</p>';
-            return;
-        }
-        // SVG donut helper (r=14, circumference≈87.96)
-        function donutChart(wins, total, color) {
-            if (!total) return `<svg width="36" height="36"><circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" stroke-width="4"/></svg>`;
-            const circ = 87.96, dash = (wins/total)*circ;
-            return `<svg width="36" height="36" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" stroke-width="4"/>
-                <circle cx="18" cy="18" r="14" fill="none" stroke="${color}" stroke-width="4"
-                    stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"
-                    transform="rotate(-90 18 18)"/>
-                <text x="18" y="22" text-anchor="middle" font-size="8" font-weight="900" fill="${color}">${Math.round(wins/total*100)}</text>
-            </svg>`;
-        }
-        const cards = leaders.map(([ldr, s]) => {
-            const winPct = s.partidas > 0 ? (s.wins/s.partidas) : 0;
-            const color = winPct >= 0.6 ? '#4ade80' : winPct >= 0.5 ? '#facc15' : '#f87171';
-            const mups = Object.entries(s.matchups).filter(([,m])=>m.w+m.l>=1);
-            const best  = mups.length ? mups.sort((a,b)=>(b[1].w/(b[1].w+b[1].l))-(a[1].w/(a[1].w+a[1].l)))[0] : null;
-            const worst = mups.length ? [...mups].sort((a,b)=>(a[1].w/(a[1].w+a[1].l))-(b[1].w/(b[1].w+b[1].l)))[0] : null;
-            const hasTO = (s.gamesFirst + s.gamesSecond) > 0;
-            const wf = s.gamesFirst > 0 ? Math.round(s.winsFirst/s.gamesFirst*100) : null;
-            const ws = s.gamesSecond > 0 ? Math.round(s.winsSecond/s.gamesSecond*100) : null;
-            const toHtml = hasTO ? `<div class="text-[9px] text-slate-600 mt-0.5 font-mono">🎲 1ro: ${wf!==null?wf+'% ('+s.gamesFirst+')':'—'}  &nbsp; 2do: ${ws!==null?ws+'% ('+s.gamesSecond+')':'—'}</div>` : '';
-            return `<div class="bg-slate-800/40 rounded-xl p-3 flex items-center gap-3 border border-slate-700/30">
-                ${donutChart(s.wins, s.partidas, color)}
-                <div class="flex-1 min-w-0">
-                    <div class="font-black text-yellow-400 text-xs truncate">${escapeHtml(ldr)}</div>
-                    <div class="text-[10px] text-slate-500 mt-0.5">${s.partidas} partidas · <span style="color:${color}">${s.wins}W–${s.losses}L</span></div>
-                    ${best ? `<div class="text-[10px] text-slate-600 truncate">✅ ${escapeHtml(best[0])} (${best[1].w}-${best[1].l})</div>` : ''}
-                    ${worst && worst[0] !== best?.[0] ? `<div class="text-[10px] text-slate-600 truncate">❌ ${escapeHtml(worst[0])} (${worst[1].w}-${worst[1].l})</div>` : ''}
-                    ${toHtml}
-                </div>
+        if (!leaders.length) { body.innerHTML = '<p class="text-slate-600 text-sm text-center py-8">Sin datos de líderes disponibles.</p>'; return; }
+        _liderList = leaders;
+        const allLdrNames = Object.keys(leaderStats).sort();
+
+        const rows = leaders.map(([ldr, s], idx) => {
+            const isOpen = liderExpandedIdx === idx;
+            const winR = s.partidas > 0 ? s.wins/s.partidas : 0;
+            const color = mrColor(s.wins, s.partidas);
+            const pct   = s.partidas ? Math.round(winR*100) : null;
+
+            let detail = '';
+            if (isOpen) {
+                // Turn order section
+                const hasTO = s.gamesFirst + s.gamesSecond > 0;
+                const toSection = hasTO ? `
+                    <div class="px-4 py-2 bg-slate-900/40 border-b border-slate-800/30">
+                        <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-1.5">🎲 Win rate por turno inicial</div>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <div class="flex justify-between text-[9px] mb-0.5">
+                                    <span class="text-slate-500">Yendo 1ro</span>
+                                    <span style="color:${mrColor(s.winsFirst,s.gamesFirst)}">${s.gamesFirst?Math.round(s.winsFirst/s.gamesFirst*100)+'%':'—'} <span class="text-slate-700">(${s.gamesFirst})</span></span>
+                                </div>
+                                ${colorBar(s.winsFirst, s.gamesFirst)}
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex justify-between text-[9px] mb-0.5">
+                                    <span class="text-slate-500">Yendo 2do</span>
+                                    <span style="color:${mrColor(s.winsSecond,s.gamesSecond)}">${s.gamesSecond?Math.round(s.winsSecond/s.gamesSecond*100)+'%':'—'} <span class="text-slate-700">(${s.gamesSecond})</span></span>
+                                </div>
+                                ${colorBar(s.winsSecond, s.gamesSecond)}
+                            </div>
+                        </div>
+                    </div>` : '';
+
+                // Matchups vs all known leaders
+                const oppRows = allLdrNames.filter(l=>l!==ldr).map(opp => {
+                    const [a,b] = [ldr,opp].sort(), key=`${a}§${b}`, stat=matchupStats[key];
+                    let lW=0,tot=0;
+                    if (stat) { tot=stat.aW+stat.bW; lW=(a===ldr)?stat.aW:stat.bW; }
+                    const col = mrColor(lW, tot);
+                    return `<div class="flex items-center gap-2 px-4 py-1.5 ${tot===0?'opacity-30':''}">
+                        <span class="text-[10px] text-slate-400 flex-1 truncate">${escapeHtml(opp)}</span>
+                        <span class="text-[10px] font-mono flex-shrink-0" style="color:${col}">${mrLabel(lW,tot)}</span>
+                        <div class="w-20 flex-shrink-0">${colorBar(lW, tot, 'h-1.5', 'w-full')}</div>
+                        <span class="text-[9px] w-7 text-right flex-shrink-0 font-black" style="color:${col}">${tot?Math.round(lW/tot*100)+'%':'—'}</span>
+                    </div>`;
+                }).join('');
+
+                detail = `${toSection}
+                    <div class="px-4 pt-1.5 pb-1">
+                        <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-1">Matchups vs oponentes</div>
+                    </div>
+                    <div class="divide-y divide-slate-800/30">${oppRows}</div>`;
+            }
+
+            return `<div class="rounded-xl border border-slate-800/40 overflow-hidden mb-1.5 bg-slate-800/20">
+                <button onclick="toggleLiderExpand(${idx})" class="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-800/50 transition text-left">
+                    ${donutSvg(s.wins, s.partidas, color)}
+                    <div class="flex-1 min-w-0">
+                        <div class="font-black text-yellow-400 text-xs truncate">${escapeHtml(ldr)}</div>
+                        <div class="text-[10px] text-slate-600 mt-0.5">${s.partidas} partidas</div>
+                    </div>
+                    <span class="text-[10px] font-mono flex-shrink-0" style="color:${color}">${s.wins}W–${s.losses}L</span>
+                    <span class="text-[10px] font-black w-9 text-right flex-shrink-0" style="color:${color}">${pct!==null?pct+'%':'—'}</span>
+                    <span class="text-[10px] text-slate-600 ml-1 flex-shrink-0">${isOpen?'▲':'▼'}</span>
+                </button>
+                ${detail}
             </div>`;
         }).join('');
-        body.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${cards}</div>`;
+        body.innerHTML = `<div class="text-[10px] text-slate-600 px-1 mb-3">${leaders.length} líderes · toca para ver detalles</div><div>${rows}</div>`;
+
     } else if (analyticsTab === 'jugadores') {
         const players_ = Object.entries(playerStats).sort((a,b)=>b[1].wins-a[1].wins||b[1].partidas-a[1].partidas);
-        if (!players_.length) {
-            body.innerHTML = '<p class="text-slate-600 text-sm text-center py-8">Sin datos de jugadores disponibles.</p>';
-            return;
-        }
+        if (!players_.length) { body.innerHTML = '<p class="text-slate-600 text-sm text-center py-8">Sin datos de jugadores disponibles.</p>'; return; }
+        _jugadorList = players_;
         const maxWins = Math.max(...players_.map(([,s])=>s.wins), 1);
-        const cards = players_.map(([name, s]) => {
-            const winPct = s.partidas > 0 ? ((s.wins/s.partidas)*100).toFixed(1) : '0.0';
-            const topLeader = Object.entries(s.leaders).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
-            const barW = Math.round((s.wins/maxWins)*100);
-            const barColor = s.partidas > 0 && s.wins/s.partidas >= 0.5 ? '#4ade80' : '#f87171';
-            return `<div class="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/30">
-                <div class="flex items-center justify-between mb-1.5">
-                    <span class="font-black text-slate-200 text-sm">${escapeHtml(name)}</span>
-                    <div class="text-right">
-                        <span class="font-black text-xs" style="color:${barColor}">${winPct}%</span>
-                        <span class="text-[10px] text-slate-600 ml-1">(${s.wins}W–${s.losses}L)</span>
+
+        const rows = players_.map(([name, s], idx) => {
+            const isOpen = jugadorExpandedIdx === idx;
+            const winR = s.partidas > 0 ? s.wins/s.partidas : 0;
+            const color = mrColor(s.wins, s.partidas);
+            const pct   = s.partidas ? Math.round(winR*100) : 0;
+            const barW  = Math.round(s.wins/maxWins*100);
+
+            let detail = '';
+            if (isOpen) {
+                // Win/loss breakdown
+                const wlSection = `<div class="px-4 py-2 bg-slate-900/40 border-b border-slate-800/30">
+                    <div class="flex gap-4 mb-1.5">
+                        <div class="flex-1 text-center bg-green-900/20 rounded-lg py-2 border border-green-900/30">
+                            <div class="text-lg font-black text-green-400">${s.wins}</div>
+                            <div class="text-[9px] text-slate-600 uppercase tracking-wider">Victorias</div>
+                        </div>
+                        <div class="flex-1 text-center bg-red-900/20 rounded-lg py-2 border border-red-900/30">
+                            <div class="text-lg font-black text-red-400">${s.losses}</div>
+                            <div class="text-[9px] text-slate-600 uppercase tracking-wider">Derrotas</div>
+                        </div>
+                        <div class="flex-1 text-center bg-slate-800/40 rounded-lg py-2 border border-slate-700/30">
+                            <div class="text-lg font-black text-slate-300">${s.partidas}</div>
+                            <div class="text-[9px] text-slate-600 uppercase tracking-wider">Partidas</div>
+                        </div>
+                        <div class="flex-1 text-center bg-slate-800/40 rounded-lg py-2 border border-slate-700/30">
+                            <div class="text-lg font-black text-blue-400">${s.sessions.size}</div>
+                            <div class="text-[9px] text-slate-600 uppercase tracking-wider">Sesiones</div>
+                        </div>
                     </div>
-                </div>
-                <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all" style="width:${barW}%;background:${barColor}"></div>
-                </div>
-                <div class="flex justify-between mt-1.5 text-[10px] text-slate-600">
-                    <span>${s.partidas} partidas · ${s.sessions.size} sesión${s.sessions.size!==1?'es':''}</span>
-                    ${topLeader ? `<span class="truncate max-w-[55%] text-right text-slate-500">${escapeHtml(topLeader)}</span>` : ''}
-                </div>
+                </div>`;
+
+                // Leaders used
+                const ldrEntries = Object.entries(s.leaders).sort((a,b)=>b[1]-a[1]);
+                const totalLdrGames = ldrEntries.reduce((acc,[,c])=>acc+c,0);
+                const ldrSection = ldrEntries.length ? `
+                    <div class="px-4 py-2 bg-slate-900/30 border-b border-slate-800/30">
+                        <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-1.5">Líderes jugados</div>
+                        ${ldrEntries.map(([l,c]) => {
+                            const lPct = totalLdrGames ? Math.round(c/totalLdrGames*100) : 0;
+                            return `<div class="flex items-center gap-2 mb-1">
+                                <span class="text-[10px] text-slate-400 flex-1 truncate">${escapeHtml(l)}</span>
+                                <span class="text-[9px] text-slate-600 flex-shrink-0 w-5 text-right">${c}x</span>
+                                <div class="w-20 flex-shrink-0">${colorBar(c, totalLdrGames, 'h-1.5', 'w-full')}</div>
+                                <span class="text-[9px] text-slate-500 w-7 text-right flex-shrink-0">${lPct}%</span>
+                            </div>`;
+                        }).join('')}
+                    </div>` : '';
+
+                detail = wlSection + ldrSection;
+            }
+
+            return `<div class="rounded-xl border border-slate-800/40 overflow-hidden mb-1.5 bg-slate-800/20">
+                <button onclick="toggleJugadorExpand(${idx})" class="w-full px-3 py-2.5 hover:bg-slate-800/50 transition text-left">
+                    <div class="flex items-center gap-3 mb-1.5">
+                        <span class="text-[10px] text-slate-600 font-mono w-4 flex-shrink-0">${idx+1}</span>
+                        <span class="font-black text-slate-200 text-sm flex-1 truncate">${escapeHtml(name)}</span>
+                        <span class="text-[10px] font-mono flex-shrink-0" style="color:${color}">${s.wins}W–${s.losses}L</span>
+                        <span class="text-[10px] font-black w-9 text-right flex-shrink-0" style="color:${color}">${pct}%</span>
+                        <span class="text-[10px] text-slate-600 ml-1 flex-shrink-0">${isOpen?'▲':'▼'}</span>
+                    </div>
+                    <div class="flex items-center gap-2 pl-7">
+                        <div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${barW}%;background:${color}"></div></div>
+                        <span class="text-[9px] text-slate-700 flex-shrink-0">${s.sessions.size} ses.</span>
+                    </div>
+                </button>
+                ${detail}
             </div>`;
         }).join('');
-        body.innerHTML = `<div class="space-y-2">${cards}</div>`;
+        body.innerHTML = `<div class="text-[10px] text-slate-600 px-1 mb-3">${players_.length} jugadores · toca para ver detalles</div><div>${rows}</div>`;
     } else if (analyticsTab === 'matchups') {
         const allLeaders = Object.keys(leaderStats).sort();
         if (!allLeaders.length) {
