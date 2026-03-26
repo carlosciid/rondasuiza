@@ -413,6 +413,7 @@ function timerReset() {
     clearInterval(tInterval); tInterval = null;
     tState = 'idle'; tSecs = T_MAIN; tBase = 'main';
     _warn5Fired = false; _warn3Fired = false;
+    timerMinimized = false;
     renderTimer();
 }
 function renderTimer() {
@@ -1162,6 +1163,7 @@ function deleteFromHistory(id) {
 // ─── ANALYTICS ────────────────────────────────────────────────────────────────
 function openAnalytics() {
     analyticsTab = 'lideres';
+    liderExpandedIdx = null; jugadorExpandedIdx = null; matchupExpandedLeader = null; matrixExpandedLeader = null;
     document.getElementById('analyticsModal').classList.remove('hidden');
     renderAnalytics();
 }
@@ -1177,20 +1179,34 @@ function setAnalyticsTab(tab) {
 }
 
 function buildAnalyticsData() {
-    // Collect all sessions: history + current
-    const allSessions = getHistory().map(h => h.snapshot);
-    // Include current session if active
-    if (tournamentStarted || tournamentFinished) {
-        const currentSnap = { players, rounds, tournamentFinished, tournamentStarted };
-        // Only add if not already in history (avoid duplicates by checking same rounds)
-        allSessions.unshift(currentSnap);
+    // Collect all sessions: history + current (deduplicated)
+    const history = getHistory();
+    // Use a fingerprint to avoid double-counting if current session was already saved
+    const currentFingerprint = tournamentStarted || tournamentFinished
+        ? `${rounds.length}_${rounds.reduce((acc,r)=>acc+r.filter(m=>m.winner).length,0)}_${players.length}`
+        : null;
+    const allSessions = history.map(h => {
+        const snap = h.snapshot;
+        const fp = `${(snap.rounds||[]).length}_${(snap.rounds||[]).reduce((acc,r)=>acc+r.filter(m=>m.winner).length,0)}_${(snap.players||[]).length}`;
+        return { snap, fp };
+    });
+    // Add current session only if not already represented in history by same fingerprint
+    if (currentFingerprint && !allSessions.some(s => s.fp === currentFingerprint)) {
+        allSessions.unshift({ snap: { players, rounds, tournamentFinished, tournamentStarted }, fp: currentFingerprint });
+    } else if (currentFingerprint) {
+        // Current session is in history; still add it if it has MORE data (in-progress save)
+        const snap = { players, rounds, tournamentFinished, tournamentStarted };
+        allSessions.unshift({ snap, fp: currentFingerprint + '_current' });
+        // Remove the duplicate from history
+        const dupIdx = allSessions.findIndex((s, i) => i > 0 && s.fp === currentFingerprint);
+        if (dupIdx > 0) allSessions.splice(dupIdx, 1);
     }
 
     const leaderStats   = {}; // leader -> { partidas, wins, losses, matchups:{opponentLeader:{w,l}} }
     const playerStats   = {}; // playerName -> { sessions:Set, partidas, wins, losses, leaders:{leader:count} }
     const matchupStats  = {}; // 'A§B' -> { a, b, aW, bW }
 
-    allSessions.forEach(snap => {
+    allSessions.forEach(({ snap }) => {
         const sPlayers = snap.players || [];
         const sRounds  = snap.rounds  || [];
         const sessionPlayerNames = new Set(sPlayers.map(p => p.name));
@@ -1605,12 +1621,13 @@ function restoreState(data) {
     matchIdCounter     = data.matchIdCounter||0;
     tournamentFormat   = data.tournamentFormat||'bo1';
 
-    // BO3 backward compat: ensure games array on bo3 matches
+    // Backward compat patches
     rounds.forEach(round => round.forEach(m => {
         if (!m.format) m.format = 'bo1';
         if (m.format === 'bo3' && !m.games && m.p2.id !== 'bye') {
             m.games = [{ winner: null }, { winner: null }, { winner: null }];
         }
+        if (!('firstPlayer' in m)) m.firstPlayer = null;  // added later
     }));
 
     document.getElementById('tourName').value = data.tournamentName||'';
