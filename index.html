@@ -240,7 +240,7 @@
             </div>
 
             <!-- Action Bar -->
-            <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 grid grid-cols-2 gap-2">
+            <div class="bg-slate-900 p-3 rounded-2xl border border-slate-800 grid grid-cols-3 gap-2">
                 <button onclick="exportTournament()" class="bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-black uppercase border border-slate-700/50 transition">💾 Guardar TXT</button>
                 <label class="bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-black uppercase border border-slate-700/50 text-center cursor-pointer transition">
                     📂 Cargar TXT
@@ -742,6 +742,7 @@ function setGameWinner(rIdx, matchId, gameIdx, side) {
 function setWinner(rIdx, matchId, winner) {
     if (tournamentFinished) return;
     const m = rounds[rIdx].find(m => m.id === matchId);
+    if (!m) return;
     m.winner = m.winner === winner ? null : winner;
     calculateStats(); renderRounds(); updateRanking(); updateRoundButtons(); autoSave();
 }
@@ -1843,12 +1844,12 @@ function simulateRound() {
     pending.forEach(m => {
         if (m.format === 'bo3' && m.games) {
             let p1w=0, p2w=0;
-            m.games.forEach((g, i) => {
-                if (p1w>=2||p2w>=2) { m.games[i].winner=null; return; }
+            for (let j=0; j<m.games.length; j++) {
+                if (p1w>=2||p2w>=2) { m.games[j].winner=null; continue; }
                 const gw = Math.random()<0.5?'p1':'p2';
-                m.games[i].winner=gw;
+                m.games[j].winner=gw;
                 if (gw==='p1') p1w++; else p2w++;
-            });
+            }
             m.winner = p1w>=2?'p1':'p2';
         } else {
             m.winner = Math.random()<0.5?'p1':'p2';
