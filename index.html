@@ -74,6 +74,18 @@
     </div>
 </div>
 
+<!-- ── Bracket Modal ── -->
+<div id="bracketModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeBracket()"></div>
+    <div class="relative bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-4xl w-full shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-black text-yellow-500">📈 Trayectoria Swiss</h2>
+            <button onclick="closeBracket()" class="text-slate-500 hover:text-slate-300 text-lg">✕</button>
+        </div>
+        <div id="bracketBody" class="overflow-y-auto flex-1 pr-1"></div>
+    </div>
+</div>
+
 <!-- ── Print Overlay ── -->
 <div id="printOverlay" class="hidden fixed inset-0 z-50 bg-slate-950 overflow-y-auto p-8">
     <div class="max-w-3xl mx-auto">
@@ -158,9 +170,10 @@
                             onkeypress="if(event.key==='Enter') addPlayer()">
                         <button onclick="addPlayer()" class="bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black px-4 rounded-xl transition">+</button>
                     </div>
-                    <input id="playerLeader" type="text" placeholder="Líder / Mazo (opcional)"
+                    <input id="playerLeader" type="text" placeholder="Líder / Mazo (opcional)" list="leaderOptions"
                         class="w-full bg-slate-800 p-2 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-xs text-slate-400"
                         onkeypress="if(event.key==='Enter') addPlayer()">
+                    <datalist id="leaderOptions"></datalist>
                 </div>
 
                 <!-- Bulk -->
@@ -221,7 +234,7 @@
                             onkeypress="if(event.key==='Enter') addLatePlayer()">
                         <button onclick="addLatePlayer()" class="bg-yellow-600 hover:bg-yellow-500 text-slate-950 font-black px-4 rounded-xl transition text-sm">+</button>
                     </div>
-                    <input id="latePlayerLeader" type="text" placeholder="Líder / Mazo (opcional)"
+                    <input id="latePlayerLeader" type="text" placeholder="Líder / Mazo (opcional)" list="leaderOptions"
                         class="w-full bg-slate-800 p-2 rounded-xl outline-none border border-slate-700 focus:border-yellow-600 transition text-xs text-slate-400">
                 </div>
             </div>
@@ -237,6 +250,8 @@
                 <button onclick="saveToHistory(); showHistory()" class="bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-black uppercase border border-slate-700/50 transition">📚 Historial</button>
                 <button onclick="openAnalytics()" class="bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-black uppercase border border-slate-700/50 transition">📊 Análisis</button>
                 <button onclick="openPrintView()" class="bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-black uppercase border border-slate-700/50 transition">🖨️ Imprimir</button>
+                <button onclick="shareByURL()" class="bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-black uppercase border border-slate-700/50 transition">🔗 Compartir</button>
+                <button onclick="openBracket()" class="bg-slate-800 hover:bg-slate-700 py-2 rounded-lg text-[10px] font-black uppercase border border-slate-700/50 transition">📈 Bracket</button>
             </div>
 
             <!-- Standings -->
@@ -280,15 +295,27 @@
             </div>
 
             <!-- Buttons -->
-            <div class="flex gap-3">
-                <button id="nextRoundBtn" onclick="generateNextRound()"
-                    class="hidden flex-1 py-4 bg-yellow-600 hover:bg-yellow-500 text-slate-950 rounded-2xl font-black text-lg uppercase transition shadow-lg shadow-yellow-900/20">
-                    Siguiente Ronda →
-                </button>
-                <button id="finishTournamentBtn" onclick="finishTournament()"
-                    class="hidden px-6 py-4 bg-red-700 hover:bg-red-600 text-white rounded-2xl font-black uppercase transition text-sm">
-                    Terminar
-                </button>
+            <div class="space-y-2">
+                <div class="flex gap-2">
+                    <button id="previewRoundBtn" onclick="previewNextRound()"
+                        class="hidden flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">
+                        👁 Preview Ronda
+                    </button>
+                    <button id="simulateRoundBtn" onclick="simulateRound()"
+                        class="hidden flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-black text-xs uppercase transition border border-slate-700/50">
+                        🎲 Simular
+                    </button>
+                </div>
+                <div class="flex gap-3">
+                    <button id="nextRoundBtn" onclick="generateNextRound()"
+                        class="hidden flex-1 py-4 bg-yellow-600 hover:bg-yellow-500 text-slate-950 rounded-2xl font-black text-lg uppercase transition shadow-lg shadow-yellow-900/20">
+                        Siguiente Ronda →
+                    </button>
+                    <button id="finishTournamentBtn" onclick="finishTournament()"
+                        class="hidden px-6 py-4 bg-red-700 hover:bg-red-600 text-white rounded-2xl font-black uppercase transition text-sm">
+                        Terminar
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -619,6 +646,7 @@ function updatePlayerList() {
             </div>`).join('');
     }
     document.getElementById('playerCount').textContent = `${players.length} jugador${players.length!==1?'es':''}`;
+    updateLeaderDatalist();
     const rec = document.getElementById('roundsRecommendation');
     if (players.length >= 2) {
         const sug = Math.ceil(Math.log2(players.length));
@@ -636,6 +664,7 @@ function startTournament() {
     document.getElementById('finishTournamentBtn').classList.remove('hidden');
     renderTimer();
     generateNextRound();
+    updateRoundButtons();
 }
 
 function mkMatchGames() {
@@ -652,6 +681,13 @@ function generateNextRound() {
     expandedRounds.clear();
     currentRound++;
     const active = players.filter(p => !p.dropped).sort((a,b) => b.points-a.points || b.omw-a.omw);
+    // Randomize first round (all players at 0 pts — registration order would otherwise determine pairings)
+    if (currentRound === 1) {
+        for (let i = active.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [active[i], active[j]] = [active[j], active[i]];
+        }
+    }
     const matches = [], paired = new Set();
 
     for (let i = 0; i < active.length; i++) {
@@ -678,6 +714,7 @@ function generateNextRound() {
         document.getElementById('nextRoundBtn').classList.remove('hidden');
         showToast(`Ronda ${currentRound} de ${totalRounds} generada.`, 'success');
     }
+    updateRoundButtons();
     setTimeout(() => document.getElementById('roundsContainer').firstElementChild?.scrollIntoView({behavior:'smooth',block:'start'}), 100);
 }
 
@@ -698,14 +735,14 @@ function setGameWinner(rIdx, matchId, gameIdx, side) {
     if (p1Wins >= 2) m.winner = 'p1';
     else if (p2Wins >= 2) m.winner = 'p2';
     else m.winner = null;
-    calculateStats(); renderRounds(); updateRanking(); autoSave();
+    calculateStats(); renderRounds(); updateRanking(); updateRoundButtons(); autoSave();
 }
 
 function setWinner(rIdx, matchId, winner) {
     if (tournamentFinished) return;
     const m = rounds[rIdx].find(m => m.id === matchId);
     m.winner = m.winner === winner ? null : winner;
-    calculateStats(); renderRounds(); updateRanking(); autoSave();
+    calculateStats(); renderRounds(); updateRanking(); updateRoundButtons(); autoSave();
 }
 function setFirstPlayer(rIdx, matchId, who) {
     const m = rounds[rIdx]?.find(m => m.id === matchId);
@@ -904,18 +941,31 @@ function updateRanking() {
         if (a.dropped !== b.dropped) return a.dropped ? 1 : -1;
         return b.points-a.points || b.omw-a.omw || b.winRate-a.winRate;
     });
+    // Recent form: collect last 3 W/L per player from completed matches
+    const recentForm = {};
+    players.forEach(p => { recentForm[p.id] = []; });
+    rounds.forEach(round => round.forEach(m => {
+        if (!m.winner || m.p2.id === 'bye') return;
+        const wId = m.winner==='p1'?m.p1.id:m.p2.id, lId = m.winner==='p1'?m.p2.id:m.p1.id;
+        if (recentForm[wId] !== undefined) recentForm[wId].push('W');
+        if (recentForm[lId] !== undefined) recentForm[lId].push('L');
+    }));
     const activeTournament = tournamentStarted && !tournamentFinished;
     document.getElementById('rankingBody').innerHTML = sorted.map((p, i) => {
         const pos = p.dropped ? '<span class="text-slate-700">—</span>' : i===0?'🥇':i===1?'🥈':i===2?'🥉':`<span class="text-slate-600 font-mono text-xs">${i+1}</span>`;
         const dropBtn = activeTournament && !p.dropped
             ? `<button onclick="dropPlayer(${p.id})" class="text-slate-700 hover:text-red-500 transition text-xs" title="Retirar jugador">✕</button>`
             : p.dropped ? '<span class="text-[10px] text-slate-700">DROP</span>' : '';
+        const form = (recentForm[p.id]||[]).slice(-3);
+        const formDots = form.map(r=>`<span class="w-1.5 h-1.5 rounded-full inline-block ${r==='W'?'bg-green-500':'bg-red-500'}"></span>`).join('');
+        const rowAccent = form.length>=2 ? (form.filter(r=>r==='W').length > form.filter(r=>r==='L').length ? 'border-l-green-800/40':'border-l-red-900/40') : '';
         return `
         <tr class="border-b border-slate-800/30 hover:bg-slate-800/20 transition ${p.dropped?'opacity-40':''}">
             <td class="py-2.5 pl-1 w-7 text-xs">${pos}</td>
             <td class="py-2.5 text-sm">
                 <div class="font-bold text-slate-200">${escapeHtml(p.name)}</div>
                 ${p.leader?`<div class="text-[10px] text-slate-600 font-mono">${escapeHtml(p.leader)}</div>`:''}
+                ${formDots?`<div class="flex items-center gap-0.5 mt-0.5">${formDots}</div>`:''}
             </td>
             <td class="py-2.5 text-center text-yellow-500 font-black text-sm">${p.points}</td>
             <td class="py-2.5 text-right text-[10px] text-slate-400 font-mono">${(p.winRate*100).toFixed(1)}%</td>
@@ -940,6 +990,8 @@ async function finishTournament() {
     btn.innerHTML = '✓ Finalizado'; btn.disabled = true;
     btn.classList.replace('bg-red-700', 'bg-slate-800');
     document.getElementById('standingsPanel').classList.add('hidden');
+    const prevBtn2 = document.getElementById('previewRoundBtn'), simBtn2 = document.getElementById('simulateRoundBtn');
+    if (prevBtn2) prevBtn2.classList.add('hidden'); if (simBtn2) simBtn2.classList.add('hidden');
     autoSave(); renderTimer(); showFinalResults();
     const top = [...players].sort((a,b)=>b.points-a.points||b.omw-a.omw)[0];
     showToast(`¡Torneo finalizado! 🥇 ${top?.name??'???'}`, 'success', 8000);
@@ -983,8 +1035,12 @@ function showFinalResults() {
             if (!wp||!lp) return '';
             const wLabel = wp.leader ? `${escapeHtml(wp.name)} <span class="text-slate-600">(${escapeHtml(wp.leader)})</span>` : escapeHtml(wp.name);
             const lLabel = lp.leader ? `${escapeHtml(lp.name)} <span class="text-slate-600">(${escapeHtml(lp.leader)})</span>` : escapeHtml(lp.name);
+            const fpId = m.firstPlayer==='p1'?m.p1.id:m.firstPlayer==='p2'?m.p2.id:null;
+            const fpName = fpId ? players.find(p=>p.id===fpId)?.name||'' : '';
+            const fpBadge = fpName ? `<span class="text-[9px] text-blue-500 font-black flex-shrink-0" title="Fue primero">🎲${escapeHtml(fpName)}</span>` : '';
             return `<div class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-800/20 text-xs">
                 <span class="text-green-400 flex-1 truncate">${wLabel}</span>
+                ${fpBadge}
                 <span class="font-black text-slate-500 flex-shrink-0 text-[10px]">▶ T${m.table}</span>
                 <span class="text-slate-600 flex-1 truncate text-right">${lLabel}</span>
             </div>`;
@@ -1099,6 +1155,16 @@ function exportClipboard() {
         const m = medals[i]||(i+1+'.'); const l = p.leader?` (${p.leader})`:'';
         txt += `${m} ${p.name}${l} — ${p.points}pts | Win%: ${(p.winRate*100).toFixed(1)}% | OMW%: ${(p.omw*100).toFixed(1)}%\n`;
     });
+    txt += '\nRESULTADOS:\n';
+    rounds.forEach((round, rIdx) => {
+        txt += `\nRonda ${rIdx+1}:\n`;
+        round.forEach(m => {
+            if (m.p2.id === 'bye') { txt += `  M${m.table}: ${m.p1.name} — BYE\n`; return; }
+            const winner = !m.winner ? 'Pendiente' : m.winner==='p1' ? m.p1.name : m.p2.name;
+            const fp = m.firstPlayer ? (m.firstPlayer==='p1' ? m.p1.name : m.p2.name) : null;
+            txt += `  M${m.table}: ${m.p1.name} vs ${m.p2.name} → ${winner}${fp?' (1ro: '+fp+')':''}\n`;
+        });
+    });
     navigator.clipboard.writeText(txt).then(()=>showToast('Copiado al portapapeles.','success')).catch(()=>showToast('No se pudo copiar.','error'));
 }
 
@@ -1203,7 +1269,7 @@ function buildAnalyticsData() {
     }
 
     const leaderStats   = {}; // leader -> { partidas, wins, losses, matchups:{opponentLeader:{w,l}} }
-    const playerStats   = {}; // playerName -> { sessions:Set, partidas, wins, losses, leaders:{leader:count} }
+    const playerStats   = {}; // playerName -> { sessions:Set, partidas, wins, losses, leaders:{leader:count}, h2h:{oppName:{w,l}} }
     const matchupStats  = {}; // 'A§B' -> { a, b, aW, bW }
 
     allSessions.forEach(({ snap }) => {
@@ -1213,7 +1279,7 @@ function buildAnalyticsData() {
 
         // Track players in this session
         sPlayers.forEach(p => {
-            if (!playerStats[p.name]) playerStats[p.name] = { sessions: new Set(), partidas: 0, wins: 0, losses: 0, leaders: {} };
+            if (!playerStats[p.name]) playerStats[p.name] = { sessions: new Set(), partidas: 0, wins: 0, losses: 0, leaders: {}, h2h: {} };
             playerStats[p.name].sessions.add(snap.tournamentName || 'unknown');
         });
 
@@ -1223,14 +1289,19 @@ function buildAnalyticsData() {
             const lp = sPlayers.find(p => p.id === (m.winner==='p1'?m.p2.id:m.p1.id));
             if (!wp || !lp) return;
 
-            // Player stats
+            // Player stats + H2H
             [wp, lp].forEach((p, i) => {
                 const isWin = i === 0;
-                if (!playerStats[p.name]) playerStats[p.name] = { sessions: new Set(), partidas: 0, wins: 0, losses: 0, leaders: {} };
+                const opp = i === 0 ? lp : wp;
+                if (!playerStats[p.name]) playerStats[p.name] = { sessions: new Set(), partidas: 0, wins: 0, losses: 0, leaders: {}, h2h: {} };
                 playerStats[p.name].partidas++;
                 if (isWin) playerStats[p.name].wins++;
                 else playerStats[p.name].losses++;
                 if (p.leader) playerStats[p.name].leaders[p.leader] = (playerStats[p.name].leaders[p.leader]||0) + 1;
+                // H2H
+                if (!playerStats[p.name].h2h[opp.name]) playerStats[p.name].h2h[opp.name] = { w:0, l:0 };
+                if (isWin) playerStats[p.name].h2h[opp.name].w++;
+                else playerStats[p.name].h2h[opp.name].l++;
             });
 
             // Leader stats
@@ -1416,7 +1487,22 @@ function renderAnalytics() {
                         }).join('')}
                     </div>` : '';
 
-                detail = wlSection + ldrSection;
+                // H2H vs opponents
+                const h2hEntries = Object.entries(s.h2h||{}).sort((a,b)=>(b[1].w+b[1].l)-(a[1].w+a[1].l));
+                const h2hSection = h2hEntries.length ? `
+                    <div class="px-4 py-2 bg-slate-900/20">
+                        <div class="text-[9px] text-slate-600 font-black uppercase tracking-wider mb-1.5">⚔️ Head-to-Head</div>
+                        ${h2hEntries.map(([opp,h])=>{
+                            const tot=h.w+h.l, col=mrColor(h.w,tot);
+                            return `<div class="flex items-center gap-2 mb-1">
+                                <span class="text-[10px] text-slate-400 flex-1 truncate">${escapeHtml(opp)}</span>
+                                <span class="text-[9px] font-mono flex-shrink-0" style="color:${col}">${h.w}W–${h.l}L</span>
+                                <div class="w-16 flex-shrink-0">${colorBar(h.w,tot,'h-1.5')}</div>
+                                <span class="text-[9px] w-7 text-right flex-shrink-0 font-black" style="color:${col}">${Math.round(h.w/tot*100)}%</span>
+                            </div>`;
+                        }).join('')}
+                    </div>` : '';
+                detail = wlSection + ldrSection + h2hSection;
             }
 
             return `<div class="rounded-xl border border-slate-800/40 overflow-hidden mb-1.5 bg-slate-800/20">
@@ -1601,6 +1687,18 @@ function autoSave() {
     localStorage.setItem('opTcgTournament', JSON.stringify(data));
 }
 async function autoLoad() {
+    // Check URL hash share first
+    if (location.hash.startsWith('#share=')) {
+        try {
+            const encoded = location.hash.slice(7);
+            const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+            if (data.players?.length) {
+                const ok = await showConfirm('Se encontró un torneo en la URL compartida.\n¿Cargar?', 'Cargar');
+                history.replaceState(null, '', location.pathname);
+                if (ok) { restoreState(data); autoSave(); return; }
+            }
+        } catch { history.replaceState(null, '', location.pathname); }
+    }
     const saved = localStorage.getItem('opTcgTournament');
     if (!saved) return;
     try {
@@ -1650,7 +1748,7 @@ function restoreState(data) {
             document.getElementById('standingsPanel').classList.add('hidden');
         }
     }
-    updatePlayerList(); calculateStats(); renderRounds(); updateRanking(); renderTimer();
+    updatePlayerList(); calculateStats(); renderRounds(); updateRanking(); renderTimer(); updateRoundButtons();
     if (tournamentFinished) showFinalResults();
 }
 async function resetTournament() {
@@ -1681,6 +1779,8 @@ async function resetTournament() {
             <p class="text-xs mt-1 text-slate-800">Agrega al menos 2 jugadores para comenzar</p>
         </div>`;
     setFormat('bo1');
+    const prevBtnR = document.getElementById('previewRoundBtn'), simBtnR = document.getElementById('simulateRoundBtn');
+    if (prevBtnR) prevBtnR.classList.add('hidden'); if (simBtnR) simBtnR.classList.add('hidden');
     timerReset(); updatePlayerList(); updateRanking(); renderTimer();
 }
 
@@ -1704,6 +1804,176 @@ function fillDemo() {
     updatePlayerList();
     autoSave();
     showToast('6 jugadores del meta cargados. ¡Listo para simular!', 'success');
+}
+
+// ─── LEADER AUTOCOMPLETE ──────────────────────────────────────────────────────
+function updateLeaderDatalist() {
+    const seen = new Set();
+    players.forEach(p => { if (p.leader) seen.add(p.leader); });
+    try {
+        (JSON.parse(localStorage.getItem('opTcgHistory')||'[]')).forEach(h =>
+            (h.snapshot?.players||[]).forEach(p => { if (p.leader) seen.add(p.leader); })
+        );
+    } catch {}
+    const dl = document.getElementById('leaderOptions');
+    if (dl) dl.innerHTML = [...seen].sort().map(l => `<option value="${escapeHtml(l)}">`).join('');
+}
+
+// ─── ROUND BUTTONS STATE ──────────────────────────────────────────────────────
+function updateRoundButtons() {
+    const active = tournamentStarted && !tournamentFinished;
+    const allDone = !rounds.length || rounds[rounds.length-1].every(m => m.winner !== null);
+    const hasPending = rounds.length > 0 && rounds[rounds.length-1].some(m => m.winner === null && m.p2.id !== 'bye');
+    const canPreview = active && allDone && currentRound < totalRounds;
+    const canSimulate = active && hasPending;
+    const prevBtn = document.getElementById('previewRoundBtn');
+    const simBtn  = document.getElementById('simulateRoundBtn');
+    if (prevBtn) prevBtn.classList.toggle('hidden', !canPreview);
+    if (simBtn)  simBtn.classList.toggle('hidden', !canSimulate);
+}
+
+// ─── SIMULATE ROUND ───────────────────────────────────────────────────────────
+function simulateRound() {
+    if (!tournamentStarted || tournamentFinished) return;
+    if (!rounds.length) { showToast('No hay ronda activa.', 'warning'); return; }
+    const round = rounds[rounds.length - 1];
+    const pending = round.filter(m => m.winner === null && m.p2.id !== 'bye');
+    if (!pending.length) { showToast('No hay matches pendientes.', 'info'); return; }
+    pending.forEach(m => {
+        if (m.format === 'bo3' && m.games) {
+            let p1w=0, p2w=0;
+            m.games.forEach((g, i) => {
+                if (p1w>=2||p2w>=2) { m.games[i].winner=null; return; }
+                const gw = Math.random()<0.5?'p1':'p2';
+                m.games[i].winner=gw;
+                if (gw==='p1') p1w++; else p2w++;
+            });
+            m.winner = p1w>=2?'p1':'p2';
+        } else {
+            m.winner = Math.random()<0.5?'p1':'p2';
+        }
+    });
+    calculateStats(); renderRounds(); updateRanking(); updateRoundButtons(); autoSave();
+    showToast(`${pending.length} match${pending.length!==1?'es':''} simulado${pending.length!==1?'s':''}.`, 'success');
+}
+
+// ─── PREVIEW NEXT ROUND ───────────────────────────────────────────────────────
+function previewNextRound() {
+    if (!tournamentStarted || tournamentFinished) return;
+    if (rounds.length > 0 && rounds[rounds.length-1].some(m => m.winner === null)) {
+        showToast('Completa la ronda actual primero.', 'warning'); return;
+    }
+    const active = players.filter(p => !p.dropped).sort((a,b) => b.points-a.points || b.omw-a.omw);
+    const preview = [], paired = new Set();
+    for (let i=0; i<active.length; i++) {
+        if (paired.has(active[i].id)) continue;
+        const p1 = active[i];
+        let p2 = active.find((p,j) => j>i && !paired.has(p.id) && !p1.opponents.includes(p.id)) || null;
+        if (!p2) p2 = active.find((p,j) => j>i && !paired.has(p.id)) || null;
+        if (p2) { preview.push({p1:p1.name,p2:p2.name,l1:p1.leader,l2:p2.leader}); paired.add(p1.id); paired.add(p2.id); }
+        else    { preview.push({p1:p1.name,p2:'BYE',l1:p1.leader,l2:''}); paired.add(p1.id); }
+    }
+    const rows = preview.map((m,i) => `
+        <div class="flex items-center gap-2 py-1.5 border-b border-slate-800/30">
+            <span class="text-[10px] text-slate-600 font-mono w-6 flex-shrink-0">M${i+1}</span>
+            <div class="flex-1 min-w-0">
+                <span class="text-slate-200 text-xs font-bold">${escapeHtml(m.p1)}</span>
+                ${m.l1?`<span class="text-[9px] text-slate-600 font-mono ml-1">${escapeHtml(m.l1)}</span>`:''}
+            </div>
+            <span class="text-slate-600 text-[10px] font-bold flex-shrink-0">vs</span>
+            <div class="flex-1 min-w-0 text-right">
+                <span class="text-slate-200 text-xs font-bold">${escapeHtml(m.p2)}</span>
+                ${m.l2?`<span class="text-[9px] text-slate-600 font-mono ml-1">${escapeHtml(m.l2)}</span>`:''}
+            </div>
+        </div>`).join('');
+    showInfoModal(`👁 Preview — Ronda ${currentRound+1}`, `<div>${rows}</div>`);
+}
+
+// ─── INFO MODAL ───────────────────────────────────────────────────────────────
+function showInfoModal(title, contentHtml) {
+    let modal = document.getElementById('infoModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'infoModal';
+        modal.className = 'hidden fixed inset-0 z-50 flex items-center justify-center p-4';
+        modal.innerHTML = `
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('infoModal').classList.add('hidden')"></div>
+            <div class="relative bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-lg w-full shadow-2xl max-h-[80vh] flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 id="infoModalTitle" class="text-sm font-black text-yellow-500"></h2>
+                    <button onclick="document.getElementById('infoModal').classList.add('hidden')" class="text-slate-500 hover:text-slate-300 text-lg">✕</button>
+                </div>
+                <div id="infoModalBody" class="overflow-y-auto flex-1 pr-1"></div>
+            </div>`;
+        document.body.appendChild(modal);
+    }
+    document.getElementById('infoModalTitle').textContent = title;
+    document.getElementById('infoModalBody').innerHTML = contentHtml;
+    modal.classList.remove('hidden');
+}
+
+// ─── SHARE BY URL ─────────────────────────────────────────────────────────────
+function shareByURL() {
+    const data = {
+        tournamentName: document.getElementById('tourName').value||'',
+        date: document.getElementById('tourDate').value,
+        players, rounds, currentRound, totalRounds, tournamentFinished, tournamentStarted, matchIdCounter, tournamentFormat
+    };
+    try {
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+        const url = `${location.origin}${location.pathname}#share=${encoded}`;
+        navigator.clipboard.writeText(url).then(
+            () => showToast('URL copiada. Compártela para cargar este torneo.', 'success', 5000),
+            () => showToast('No se pudo copiar al portapapeles.', 'warning')
+        );
+    } catch(e) { showToast('Error al generar URL.', 'error'); }
+}
+
+// ─── BRACKET VIEW ─────────────────────────────────────────────────────────────
+function openBracket() {
+    document.getElementById('bracketModal').classList.remove('hidden');
+    renderBracket();
+}
+function closeBracket() { document.getElementById('bracketModal').classList.add('hidden'); }
+function renderBracket() {
+    const body = document.getElementById('bracketBody');
+    if (!rounds.length) { body.innerHTML='<p class="text-slate-600 text-sm text-center py-8">Sin rondas disponibles.</p>'; return; }
+    const sorted = [...players].sort((a,b) => b.points-a.points || b.omw-a.omw);
+    const headers = rounds.map((_,i) => `<th class="px-2 py-1.5 text-center text-[10px] text-slate-600 font-black uppercase whitespace-nowrap">R${i+1}</th>`).join('');
+    const rows = sorted.map(p => {
+        const cells = rounds.map(round => {
+            const m = round.find(m => m.p1.id===p.id || m.p2.id===p.id);
+            if (!m) return `<td class="px-2 py-2 text-center"><span class="text-slate-800 text-[9px]">—</span></td>`;
+            if (m.p2.id==='bye') return `<td class="px-2 py-2 text-center"><span class="text-[9px] text-slate-600">BYE</span></td>`;
+            const opp  = m.p1.id===p.id ? m.p2 : m.p1;
+            const won  = m.winner && (m.winner==='p1'?m.p1.id:m.p2.id)===p.id;
+            const col  = !m.winner ? 'text-slate-600' : won ? 'text-green-400' : 'text-red-400';
+            const res  = !m.winner ? '?' : won ? 'W' : 'L';
+            return `<td class="px-2 py-2 text-center">
+                <div class="text-[10px] font-black ${col}">${res}</div>
+                <div class="text-[8px] text-slate-600 truncate" style="max-width:60px">${escapeHtml(opp.name)}</div>
+            </td>`;
+        }).join('');
+        const fc = p.winRate>0.5?'text-green-400':p.matchesPlayed>0&&p.winRate<0.5?'text-red-400':'text-slate-400';
+        return `<tr class="border-b border-slate-800/30 hover:bg-slate-800/10 transition">
+            <td class="pr-3 py-2 text-left" style="min-width:90px">
+                <div class="font-bold text-slate-200 text-xs truncate">${escapeHtml(p.name)}</div>
+                ${p.leader?`<div class="text-[8px] text-slate-600 font-mono truncate">${escapeHtml(p.leader)}</div>`:''}
+                <div class="text-[9px] font-black ${fc}">${p.points}pts</div>
+            </td>${cells}
+        </tr>`;
+    }).join('');
+    body.innerHTML = `
+        <div class="overflow-x-auto">
+            <table class="border-collapse">
+                <thead><tr>
+                    <th class="pr-3 py-1.5 text-left text-[10px] text-slate-600 font-black uppercase" style="min-width:90px">Jugador</th>
+                    ${headers}
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+        <p class="text-[9px] text-slate-700 mt-3 px-1">W = Victoria · L = Derrota · ? = Pendiente</p>`;
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
